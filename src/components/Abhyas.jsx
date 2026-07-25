@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { abhyasContextData } from '../data/contextualLearning';
 import AbhyasMF from './AbhyasMF';
-import AbhyasUltimate from './AbhyasUltimate';
+import { useAuth } from '../context/AuthContext';
+import { updatePortfolio } from '../services/db';
+import toast from 'react-hot-toast';
+
+
 
 // ==========================================
 // TRADINGVIEW ADVANCED CHART WIDGET
@@ -138,46 +142,68 @@ function TickerBar() {
 }
 
 // ==========================================
-// STATIC STOCK CATALOG
-// ==========================================
-const STOCK_CATALOG = [
-  { symbol: 'BSE:RELIANCE', ns: 'RELIANCE.NS', name: 'Reliance Industries', sector: 'Energy/Retail', price: 2450.00, change: 1.4, mktCap: '₹16.6L Cr' },
-  { symbol: 'BSE:TCS', ns: 'TCS.NS', name: 'TCS', sector: 'IT Services', price: 3850.00, change: -0.8, mktCap: '₹13.9L Cr' },
-  { symbol: 'BSE:HDFCBANK', ns: 'HDFCBANK.NS', name: 'HDFC Bank', sector: 'Banking', price: 1620.00, change: -0.3, mktCap: '₹12.3L Cr' },
-  { symbol: 'BSE:INFY', ns: 'INFY.NS', name: 'Infosys', sector: 'IT Services', price: 1540.00, change: 0.5, mktCap: '₹6.4L Cr' },
-  { symbol: 'BSE:ICICIBANK', ns: 'ICICIBANK.NS', name: 'ICICI Bank', sector: 'Banking', price: 1110.00, change: 1.1, mktCap: '₹7.8L Cr' },
-  { symbol: 'BSE:SBIN', ns: 'SBIN.NS', name: 'State Bank of India', sector: 'Banking', price: 830.00, change: 2.3, mktCap: '₹7.4L Cr' },
-  { symbol: 'BSE:BAJFINANCE', ns: 'BAJFINANCE.NS', name: 'Bajaj Finance', sector: 'NBFC', price: 6850.00, change: 0.1, mktCap: '₹4.2L Cr' },
-  { symbol: 'BSE:ASIANPAINT', ns: 'ASIANPAINT.NS', name: 'Asian Paints', sector: 'Consumer', price: 2890.00, change: -0.5, mktCap: '₹2.8L Cr' },
-  { symbol: 'BSE:TITAN', ns: 'TITAN.NS', name: 'Titan Company', sector: 'Consumer', price: 3250.00, change: 0.8, mktCap: '₹2.9L Cr' },
-  { symbol: 'BSE:ZOMATO', ns: 'ZOMATO.NS', name: 'Zomato', sector: 'Tech/Food', price: 265.00, change: 4.2, mktCap: '₹2.4L Cr' },
-  { symbol: 'BSE:ITC', ns: 'ITC.NS', name: 'ITC Ltd', sector: 'FMCG', price: 430.00, change: 0.3, mktCap: '₹5.4L Cr' },
-  { symbol: 'BSE:MARUTI', ns: 'MARUTI.NS', name: 'Maruti Suzuki', sector: 'Auto', price: 12100.00, change: 1.2, mktCap: '₹3.7L Cr' },
-  { symbol: 'BSE:TATAMOTORS', ns: 'TATAMOTORS.NS', name: 'Tata Motors', sector: 'Auto', price: 960.00, change: 1.7, mktCap: '₹3.5L Cr' },
-  { symbol: 'BSE:WIPRO', ns: 'WIPRO.NS', name: 'Wipro Ltd', sector: 'IT Services', price: 460.00, change: -1.2, mktCap: '₹2.4L Cr' },
-  { symbol: 'BSE:COALINDIA', ns: 'COALINDIA.NS', name: 'Coal India', sector: 'Mining', price: 470.00, change: -0.4, mktCap: '₹2.9L Cr' },
-  { symbol: 'BSE:SENSEX', ns: 'SENSEX.BS', name: 'Sensex Index', sector: 'Index', price: 81300.00, change: 0.4, mktCap: 'Index' },
-];
-
-// ==========================================
 // MAIN ABHYAS TERMINAL
 // ==========================================
 export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
   const getTxt = (en, hi) => lang === 'en' ? en : hi;
 
+  const { currentUser } = useAuth();
+  
   // ---- State ----
-  const [subTab, setSubTab] = useState('ultimate'); // 'ultimate' | 'stocks' | 'mf'
+  const [subTab, setSubTab] = useState('stocks'); // 'ultimate' | 'stocks' | 'mf'
   const [portfolio, setPortfolio] = useState(() => {
-    const saved = localStorage.getItem('abhyas_portfolio_v2');
-    return saved ? JSON.parse(saved) : { balance: 100000, holdings: [], transactions: [] };
+    // Migrate to Firestore: fallback to default if missing, ignore localStorage
+    return currentUser?.portfolio || { balance: 1000000, holdings: [], transactions: [] };
   });
 
-  const [selectedSymbol, setSelectedSymbol] = useState(STOCK_CATALOG[0]);
+  const [stockCatalog, setStockCatalog] = useState([]);
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
+  const [selectedSymbol, setSelectedSymbol] = useState(null);
+  
+  useEffect(() => {
+    const fetchMarketData = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/market/quotes');
+        if (res.ok) {
+          const data = await res.json();
+          // Filter to just STOCK or INDEX (ignore mutual funds for this tab)
+          const stocks = data.filter(d => d.asset_type === 'STOCK' || d.asset_type === 'INDEX').map(asset => {
+            // Calculate a mock change if history is empty, otherwise use history
+            let changePercent = 0;
+            if (asset.history && asset.history.length > 1) {
+              const prev = asset.history[1].close;
+              const curr = asset.history[0].close;
+              changePercent = ((curr - prev) / prev) * 100;
+            } else {
+              changePercent = (Math.random() * 4) - 2; // Simulated +/- 2%
+            }
+            
+            return {
+              symbol: `NSE:${asset.symbol.replace('.NS', '')}`,
+              ns: asset.symbol,
+              name: asset.name,
+              sector: asset.sector,
+              price: asset.current_price,
+              change: changePercent,
+              mktCap: asset.is_live ? 'Live Market' : 'Simulated',
+              isLive: asset.is_live
+            };
+          });
+          setStockCatalog(stocks);
+          setSelectedSymbol(stocks[0]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch market data:", err);
+      } finally {
+        setIsLoadingCatalog(false);
+      }
+    };
+    fetchMarketData();
+  }, []);
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState('positions'); // 'positions' | 'orders' | 'pnl'
   const [searchQ, setSearchQ] = useState('');
   const [showSearch, setShowSearch] = useState(false);
-  const [tradeMsg, setTradeMsg] = useState(null); // { type: 'success'|'error', text }
   const [showAddFunds, setShowAddFunds] = useState(false);
   const [addFundsAmt, setAddFundsAmt] = useState('');
   const [showConfirm, setShowConfirm] = useState(null); // { type: 'BUY'|'SELL' }
@@ -188,8 +214,10 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
 
   const savePortfolio = useCallback((p) => {
     setPortfolio(p);
-    localStorage.setItem('abhyas_portfolio_v2', JSON.stringify(p));
-  }, []);
+    if (currentUser) {
+      updatePortfolio(currentUser.uid, p);
+    }
+  }, [currentUser]);
 
   // ---- Derived ----
   const stockPrice = selectedSymbol?.price || 0;
@@ -201,16 +229,15 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
 
   // Total portfolio value
   const totalPortfolioValue = portfolio.holdings.reduce((acc, h) => {
-    const s = STOCK_CATALOG.find(s => s.ns === h.symbol);
+    const s = stockCatalog.find(s => s.ns === h.symbol);
     return acc + (s ? s.price * h.quantity : h.avgBuyPrice * h.quantity);
   }, portfolio.balance);
 
   // ---- Trade ----
   const placeTrade = (type) => {
-    setTradeMsg(null);
     const qtyN = parseInt(qty);
     if (isNaN(qtyN) || qtyN <= 0) {
-      setTradeMsg({ type: 'error', text: 'Enter a valid quantity (minimum 1)' });
+      toast.error('Enter a valid quantity (minimum 1)');
       return;
     }
 
@@ -218,13 +245,13 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
     const total = stock.price * qtyN;
 
     if (type === 'BUY' && portfolio.balance < total) {
-      setTradeMsg({ type: 'error', text: `Insufficient virtual balance. Need ₹${total.toLocaleString('en-IN', { maximumFractionDigits: 0 })} — have ₹${portfolio.balance.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` });
+      toast.error(`Insufficient virtual balance. Need ₹${total.toLocaleString('en-IN', { maximumFractionDigits: 0 })} — have ₹${portfolio.balance.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`);
       return;
     }
     if (type === 'SELL') {
       const h = portfolio.holdings.find(h => h.symbol === stock.ns);
       if (!h || h.quantity < qtyN) {
-        setTradeMsg({ type: 'error', text: `You only hold ${h?.quantity || 0} shares. Cannot sell ${qtyN}.` });
+        toast.error(`You only hold ${h?.quantity || 0} shares. Cannot sell ${qtyN}.`);
         return;
       }
     }
@@ -253,16 +280,16 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
       ts: new Date().toLocaleString('en-IN')
     });
     savePortfolio(p);
-    setTradeMsg({ type: 'success', text: `${type} executed: ${qtyN} × ${stock.name} @ ₹${stock.price.toLocaleString('en-IN')}` });
     setShowConfirm(null);
-    setTimeout(() => setTradeMsg(null), 4000);
+    setQty(1);
+    toast.success(`${type} executed: ${qtyN} × ${stock.name} @ ₹${stock.price.toLocaleString('en-IN')}`);
   };
 
   // ---- Add Funds ----
   const handleAddFunds = () => {
-    const amt = parseFloat(addFundsAmt);
+    const amt = parseInt(addFundsAmt);
     if (isNaN(amt) || amt <= 0 || amt > 10000000) {
-      setTradeMsg({ type: 'error', text: 'Enter a valid amount (max ₹1 Crore)' });
+      toast.error('Enter a valid amount (max ₹1 Crore)');
       return;
     }
     const p = JSON.parse(JSON.stringify(portfolio));
@@ -274,8 +301,7 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
     savePortfolio(p);
     setAddFundsAmt('');
     setShowAddFunds(false);
-    setTradeMsg({ type: 'success', text: `₹${amt.toLocaleString('en-IN')} added to virtual account` });
-    setTimeout(() => setTradeMsg(null), 3000);
+    toast.success(`₹${amt.toLocaleString('en-IN')} added to virtual account`);
   };
 
   // ---- Reset ----
@@ -423,9 +449,9 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
   };
 
   // ---- Search ----
-  const filteredStocks = STOCK_CATALOG.filter(s =>
-    s.name.toLowerCase().includes(searchQ.toLowerCase()) ||
+  const filteredStocks = stockCatalog.filter(s =>
     s.symbol.toLowerCase().includes(searchQ.toLowerCase()) ||
+    s.name.toLowerCase().includes(searchQ.toLowerCase()) ||
     s.sector.toLowerCase().includes(searchQ.toLowerCase())
   );
 
@@ -489,25 +515,7 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
         flexShrink: 0
       }}>
-        <button
-          onClick={() => setSubTab('ultimate')}
-          style={{
-            background: subTab === 'ultimate' ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(6, 182, 212, 0.25) 100%)' : 'transparent',
-            border: subTab === 'ultimate' ? '1.5px solid #06b6d4' : '1.5px solid transparent',
-            borderRadius: '20px',
-            color: subTab === 'ultimate' ? '#fff' : 'rgba(255, 255, 255, 0.65)',
-            padding: '8px 18px',
-            fontSize: '0.82rem',
-            fontWeight: '900',
-            cursor: 'pointer',
-            transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-            textShadow: subTab === 'ultimate' ? '0 0 6px #06b6d4' : 'none',
-            boxShadow: subTab === 'ultimate' ? '0 0 15px rgba(6, 182, 212, 0.35)' : 'none',
-            outline: 'none'
-          }}
-        >
-          🚀 {getTxt('Abhyas Ultimate', 'अभ्यास अल्टीमेट')}
-        </button>
+
         <button
           onClick={() => setSubTab('stocks')}
           style={{
@@ -544,16 +552,44 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
             outline: 'none'
           }}
         >
-          📈 {getTxt('Mutual Funds (Classic)', 'क्लासिक म्यूचुअल फंड')}
+      📈 {getTxt('Mutual Funds (Classic)', 'क्लासिक म्यूचुअल फंड')}
         </button>
       </div>
 
-      {subTab === 'ultimate' ? (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <AbhyasUltimate lang={lang} theme={theme} />
-        </div>
-      ) : subTab === 'stocks' ? (
+      {subTab === 'stocks' ? (
         <>
+          {/* --- SEARCH / SELECT --- */}
+          <div style={{ padding: '16px', borderBottom: '1px solid #1a2840', position: 'relative' }}>
+            {isLoadingCatalog ? (
+              <div style={{ height: '42px', width: '100%', backgroundColor: '#0f1e35', borderRadius: '8px', animation: 'pulse 1.5s infinite' }} />
+            ) : (
+              <div 
+                onClick={() => setShowSearch(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 16px',
+                  backgroundColor: '#0A1628',
+                  borderRadius: '12px',
+                  border: '1px solid #1a2840',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ fontSize: '18px' }}>🔍</div>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, color: '#E8E4DA' }}>
+                    {selectedSymbol?.name || 'Loading...'} <span style={{ color: '#8FA0B5', fontSize: '0.8rem', fontWeight: 'normal' }}>{selectedSymbol?.ns}</span>
+                  </h3>
+                  <div style={{ fontSize: '0.75rem', color: '#8FA0B5', marginTop: '2px' }}>
+                    {selectedSymbol?.sector} • {selectedSymbol?.mktCap}
+                  </div>
+                </div>
+                <div style={{ marginLeft: 'auto', fontSize: '18px', color: '#8FA0B5' }}>▼</div>
+              </div>
+            )}
+          </div>
+
           {/* SYMBOL SEARCH BAR */}
           <div style={{
         backgroundColor: '#0A1628',
@@ -814,12 +850,31 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
                   <tbody>
                     {portfolio.holdings.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#8FA0B5', fontSize: '0.82rem' }}>
-                          No active positions. Select a stock and place your first virtual trade →
+                        <td colSpan={7} style={{ padding: '64px 24px', textAlign: 'center', backgroundColor: 'rgba(26, 40, 64, 0.3)' }}>
+                          <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.8 }}>📈</div>
+                          <h4 style={{ color: 'var(--text-primary)', fontSize: '1.2rem', marginBottom: '8px' }}>Your Portfolio is Empty</h4>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '300px', margin: '0 auto 20px auto' }}>
+                            You haven't made any trades yet. Explore the stock catalog above to make your first virtual investment.
+                          </p>
+                          <button 
+                            onClick={() => setShowSearch(true)}
+                            style={{
+                              background: 'var(--color-indigo)',
+                              color: 'white',
+                              border: 'none',
+                              padding: '10px 20px',
+                              borderRadius: '8px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 12px rgba(139, 127, 255, 0.4)'
+                            }}
+                          >
+                            Explore Stocks 🔍
+                          </button>
                         </td>
                       </tr>
                     ) : portfolio.holdings.map(h => {
-                      const s = STOCK_CATALOG.find(x => x.ns === h.symbol);
+                      const s = stockCatalog.find(x => x.ns === h.symbol);
                       const ltp = s?.price || h.avgBuyPrice;
                       const pl = (ltp - h.avgBuyPrice) * h.quantity;
                       const plPct = ((ltp - h.avgBuyPrice) / h.avgBuyPrice * 100);
@@ -1286,24 +1341,7 @@ export default function Abhyas({ lang, theme, onNavigateToSeekho }) {
         </div>
       )}
 
-      {/* TRADE STATUS TOAST */}
-      {tradeMsg && (
-        <div style={{
-          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          backgroundColor: tradeMsg.type === 'success' ? '#14532d' : '#450a0a',
-          border: `1px solid ${tradeMsg.type === 'success' ? '#22c55e' : '#ef4444'}`,
-          borderRadius: '8px', padding: '12px 20px',
-          color: tradeMsg.type === 'success' ? '#22c55e' : '#ef4444',
-          fontWeight: '700', fontSize: '0.85rem',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-          zIndex: 2000, display: 'flex', alignItems: 'center', gap: '8px',
-          animation: 'fade-in 0.2s ease',
-          maxWidth: '90vw'
-        }}>
-          <span>{tradeMsg.type === 'success' ? '✅' : '❌'}</span>
-          {tradeMsg.text}
-        </div>
-      )}
+
 
       <style>{`
         @keyframes fade-in {

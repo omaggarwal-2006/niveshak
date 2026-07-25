@@ -8,13 +8,17 @@ import {
   MessageSquare, 
   TrendingUp, 
   Flame, 
-  Award, 
   ArrowRight,
-  RefreshCw
+  ShieldCheck,
+  Download,
+  Upload,
+  Trophy,
+  Zap,
+  Award
 } from 'lucide-react';
 import { tracks } from '../data/lessons';
 
-// --- Reusable CountUp Component (Part A, Feature 6) ---
+// --- Reusable CountUp Component ---
 function CountUp({ end, duration = 1200, suffix = '', prefix = '' }) {
   const [value, setValue] = useState(0);
 
@@ -55,15 +59,15 @@ function CountUp({ end, duration = 1200, suffix = '', prefix = '' }) {
     return prefix + value.toLocaleString('en-IN') + suffix;
   };
 
-  return <span className="numeric-data">{formatVal()}</span>;
+  return <span className="numeric-data" style={{ fontFamily: 'Inter, monospace', fontWeight: 800 }}>{formatVal()}</span>;
 }
 
-// --- Reusable 3D TiltCard Component (Part A, Feature 2) ---
+// --- Reusable 3D TiltCard Component ---
 function TiltCard({ children, className, style }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const rotateX = useSpring(useTransform(y, [-100, 100], [8, -8]), { stiffness: 300, damping: 30 });
-  const rotateY = useSpring(useTransform(x, [-100, 100], [-8, 8]), { stiffness: 300, damping: 30 });
+  const rotateX = useSpring(useTransform(y, [-100, 100], [5, -5]), { stiffness: 300, damping: 30 });
+  const rotateY = useSpring(useTransform(x, [-100, 100], [-5, 5]), { stiffness: 300, damping: 30 });
 
   function handleMouseMove(e) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -87,41 +91,30 @@ function TiltCard({ children, className, style }) {
   );
 }
 
-export default function Dashboard({ lang, setLang, completedLessons = [], completedTracks = [], scanHistory = [], setCurrentRoute, getTxt }) {
-  const [userName, setUserName] = useState('');
+export default function Dashboard({ 
+  lang, 
+  setLang, 
+  userName = 'Investor',
+  completedLessons = [], 
+  completedTracks = [], 
+  scanHistory = [], 
+  setCurrentRoute, 
+  getTxt,
+  onOpenProfileModal,
+  onGlobalSearch
+}) {
   const [streak, setStreak] = useState(1);
   const [portfolioValue, setPortfolioValue] = useState(1000000);
   const [portfolioReturn, setPortfolioReturn] = useState(0);
 
-  // Profile Switcher States
-  const [profiles, setProfiles] = useState([]);
-  const [activeProfileId, setActiveProfileId] = useState('default_profile');
-  const [newProfileName, setNewProfileName] = useState('');
-  const [showCreateProfile, setShowCreateProfile] = useState(false);
-  const [notifyEnabled, setNotifyEnabled] = useState(false);
-
-  const portalRef = useRef(null);
-
-  const handlePortalMouseMove = (e) => {
-    if (!portalRef.current) return;
-    const rect = portalRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    portalRef.current.style.setProperty('--mouse-x', `${x}px`);
-    portalRef.current.style.setProperty('--mouse-y', `${y}px`);
-  };
-
   useEffect(() => {
-    // Load local storage values
-    const storedName = localStorage.getItem('safalniveshak_username') || getTxt('Investor', 'निवेशक');
-    setUserName(storedName);
 
     try {
       const storedStreak = localStorage.getItem('safalniveshak_streak');
       if (storedStreak) setStreak(parseInt(storedStreak, 10));
     } catch (e) {}
 
-    // Load active simulated portfolio metrics (if they exist in localStorage)
+    // Load active simulated portfolio metrics
     try {
       const storedPortfolio = localStorage.getItem('abhyas_portfolio_v2');
       if (storedPortfolio) {
@@ -139,228 +132,15 @@ export default function Dashboard({ lang, setLang, completedLessons = [], comple
         }
       }
     } catch (err) {}
-
-    // Load profiles switcher
-    try {
-      const savedProfiles = localStorage.getItem('safalniveshak_profiles');
-      const activeId = localStorage.getItem('safalniveshak_active_profile_id') || 'default_profile';
-      setActiveProfileId(activeId);
-      if (savedProfiles) {
-        setProfiles(JSON.parse(savedProfiles));
-      } else {
-        const initialProfiles = [{
-          id: 'default_profile',
-          name: storedName,
-          xp: 150,
-          created_at: new Date().toLocaleDateString('en-IN'),
-          data: {}
-        }];
-        setProfiles(initialProfiles);
-        localStorage.setItem('safalniveshak_profiles', JSON.stringify(initialProfiles));
-      }
-    } catch (err) {}
-
-    // Load notification setting status
-    const notifySaved = localStorage.getItem('safalniveshak_notifications_enabled') === 'true';
-    setNotifyEnabled(notifySaved);
   }, [getTxt]);
 
-  // ---- Data Backup & Restore Operations ----
+  // Data Export & Import Handlers deprecated in favor of Cloud Sync
   const handleExportData = () => {
-    const keys = [
-      'safalniveshak_username',
-      'safalniveshak_lessons',
-      'safalniveshak_tracks',
-      'safalniveshak_history',
-      'safalniveshak_feedback',
-      'safalniveshak_portfolio',
-      'safalniveshak_mf_portfolio',
-      'safalniveshak_profiles',
-      'safalniveshak_active_profile_id',
-      'safalniveshak_splash_seen',
-      'safalniveshak_onboarded',
-      'safalniveshak_learning_progress'
-    ];
-    
-    const backup = {};
-    keys.forEach(k => {
-      const val = localStorage.getItem(k);
-      if (val !== null) backup[k] = val;
-    });
-
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `SafalNiveshak_Backup_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    alert("Data is now securely synced to your cloud account.");
   };
 
   const handleImportData = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = JSON.parse(event.target.result);
-        Object.keys(data).forEach(key => {
-          localStorage.setItem(key, data[key]);
-        });
-        alert(lang === 'en' ? 'Data imported successfully! Reloading...' : 'डेटा सफलतापूर्वक इम्पोर्ट किया गया! रीलोड हो रहा है...');
-        window.location.reload();
-      } catch (err) {
-        alert(lang === 'en' ? 'Failed to parse backup JSON.' : 'बैकअप फ़ाइल लोड करने में असमर्थ।');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  // ---- Multi-Profile Management Operations ----
-  const saveCurrentProfileData = (profilesList, activeId) => {
-    const profileData = {
-      safalniveshak_username: localStorage.getItem('safalniveshak_username') || 'Guest',
-      safalniveshak_lessons: localStorage.getItem('safalniveshak_lessons') || '[]',
-      safalniveshak_tracks: localStorage.getItem('safalniveshak_tracks') || '[]',
-      safalniveshak_history: localStorage.getItem('safalniveshak_history') || '[]',
-      safalniveshak_feedback: localStorage.getItem('safalniveshak_feedback') || '[]',
-      abhyas_portfolio_v2: localStorage.getItem('abhyas_portfolio_v2') || null,
-      safalniveshak_mf_portfolio: localStorage.getItem('safalniveshak_mf_portfolio') || null
-    };
-
-    const lessons = JSON.parse(profileData.safalniveshak_lessons);
-    const tracksList = JSON.parse(profileData.safalniveshak_tracks);
-    const history = JSON.parse(profileData.safalniveshak_history);
-    const xp = (lessons.length * 50) + (tracksList.length * 200) + (history.length * 25);
-
-    let updated = [...profilesList];
-    const existingIdx = updated.findIndex(p => p.id === activeId);
-    if (existingIdx !== -1) {
-      updated[existingIdx].xp = xp;
-      updated[existingIdx].name = profileData.safalniveshak_username;
-      updated[existingIdx].data = profileData;
-    } else {
-      updated.push({
-        id: activeId,
-        name: profileData.safalniveshak_username,
-        xp,
-        created_at: new Date().toLocaleDateString('en-IN'),
-        data: profileData
-      });
-    }
-    localStorage.setItem('safalniveshak_profiles', JSON.stringify(updated));
-    return updated;
-  };
-
-  const handleSwitchProfile = (targetId) => {
-    if (targetId === activeProfileId) return;
-    const updatedProfiles = saveCurrentProfileData(profiles, activeProfileId);
-    const targetProf = updatedProfiles.find(p => p.id === targetId);
-    if (targetProf && targetProf.data) {
-      Object.keys(targetProf.data).forEach(key => {
-        if (targetProf.data[key] !== null) {
-          localStorage.setItem(key, targetProf.data[key]);
-        } else {
-          localStorage.removeItem(key);
-        }
-      });
-    }
-    localStorage.setItem('safalniveshak_active_profile_id', targetId);
-    alert(lang === 'en' ? `Switched profile to ${targetProf?.name || 'Guest'}! Reloading...` : `${targetProf?.name || 'Guest'} प्रोफाइल पर स्विच किया गया! रीलोड हो रहा है...`);
-    window.location.reload();
-  };
-
-  const handleCreateProfile = (e) => {
-    e.preventDefault();
-    if (!newProfileName.trim()) return;
-
-    saveCurrentProfileData(profiles, activeProfileId);
-    const newId = 'profile_' + Date.now();
-    const freshData = {
-      safalniveshak_username: newProfileName.trim(),
-      safalniveshak_lessons: '[]',
-      safalniveshak_tracks: '[]',
-      safalniveshak_history: '[]',
-      safalniveshak_feedback: '[]',
-      abhyas_portfolio_v2: null,
-      safalniveshak_mf_portfolio: null
-    };
-
-    let updatedProfiles = [];
-    try {
-      const saved = localStorage.getItem('safalniveshak_profiles');
-      updatedProfiles = saved ? JSON.parse(saved) : [];
-    } catch (err) {}
-
-    updatedProfiles.push({
-      id: newId,
-      name: newProfileName.trim(),
-      xp: 0,
-      created_at: new Date().toLocaleDateString('en-IN'),
-      data: freshData
-    });
-
-    localStorage.setItem('safalniveshak_profiles', JSON.stringify(updatedProfiles));
-    localStorage.setItem('safalniveshak_active_profile_id', newId);
-
-    Object.keys(freshData).forEach(key => {
-      if (freshData[key] !== null) {
-        localStorage.setItem(key, freshData[key]);
-      } else {
-        localStorage.removeItem(key);
-      }
-    });
-
-    alert(lang === 'en' ? `New profile "${newProfileName}" created successfully! Reloading...` : `नया प्रोफ़ाइल "${newProfileName}" सफलतापूर्वक बनाया गया! रीलोड हो रहा है...`);
-    window.location.reload();
-  };
-
-  // ---- Reminder/Notification System Operations ----
-  const handleToggleNotifications = async () => {
-    if (notifyEnabled) {
-      setNotifyEnabled(false);
-      localStorage.setItem('safalniveshak_notifications_enabled', 'false');
-      return;
-    }
-
-    if (!('Notification' in window)) {
-      alert(lang === 'en' ? 'Desktop notifications are not supported in this browser.' : 'इस ब्राउज़र में नोटिफिकेशन सपोर्टेड नहीं है।');
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      setNotifyEnabled(true);
-      localStorage.setItem('safalniveshak_notifications_enabled', 'true');
-      
-      // Trigger instant daily quiz alert
-      setTimeout(() => {
-        new Notification(getTxt("SafalNiveshak Quiz Alert! 🛡️", "सफल निवेशक क्विज़ अलर्ट! 🛡️"), {
-          body: getTxt(
-            "Ready for your daily 5-minute financial safety quiz? Tap to open!",
-            "क्या आप अपने दैनिक ५ मिनट के वित्तीय सुरक्षा क्विज़ के लिए तैयार हैं? खोलने के लिए क्लिक करें!"
-          ),
-          icon: "/favicon.ico"
-        });
-      }, 2500);
-
-      // Trigger instant SIP reminder
-      setTimeout(() => {
-        new Notification(getTxt("SafalNiveshak: SIP Due Alert! 📈", "सफल निवेशक: एसआईपी ड्यू अलर्ट! 📈"), {
-          body: getTxt(
-            "Your monthly virtual SIP payment in Equity Index Fund is due. Keep practicing!",
-            "इक्विटी इंडेक्स फंड में आपका मासिक आवर्ती निवेश (SIP) का समय हो गया है। अभ्यास जारी रखें!"
-          ),
-          icon: "/favicon.ico"
-        });
-      }, 8000);
-
-    } else {
-      alert(lang === 'en' ? 'Notification permission was denied.' : 'नोटिफिकेशन अनुमति अस्वीकार कर दी गई थी।');
-    }
+    alert("Data import is disabled. Cloud sync is active.");
   };
 
   // Calculate XP and Levels
@@ -392,138 +172,157 @@ export default function Dashboard({ lang, setLang, completedLessons = [], comple
   const nextLesson = getContinueLesson();
 
   const quickAccessItems = [
-    { id: 'seekho', label: getTxt('Seekho Classroom', 'सीखो पाठशाला'), icon: BookOpen, desc: getTxt('Bilingual lessons', 'द्विभाषी पाठ'), color: '#a855f7' },
-    { id: 'abhyas', label: getTxt('Abhyas Arena', 'अभ्यास सिमुलेटर'), icon: TrendingUp, desc: getTxt('Virtual trading', 'वर्चुअल ट्रेडिंग'), color: '#3b82f6' },
-    { id: 'hisab', label: getTxt('Hisab Calculator', 'हिसाब कैलकुलेटर'), icon: Calculator, desc: getTxt('SIP & Tax options', 'एसआईपी व टैक्स'), color: '#06b6d4' },
-    { id: 'bachao', label: getTxt('Scam Shield', 'बचाओ स्कैम शील्ड'), icon: ShieldAlert, desc: getTxt('Verify tips & links', 'टिप्स की जांच करें'), color: '#ef4444' },
-    { id: 'sebi', label: getTxt('SEBI Verification', 'सेबी सत्यापन'), icon: Search, desc: getTxt('Search registered RIAs', 'सत्यापित सलाहकार'), color: '#fb923c' },
-    { id: 'safalmitra', label: getTxt('SafalMitra AI', 'सफल मित्र चैट'), icon: MessageSquare, desc: getTxt('Offline support bot', 'सपोर्ट बोट'), color: '#10b981' }
+    { id: 'seekho', label: getTxt('Seekho Classroom', 'सीखो पाठशाला'), icon: BookOpen, desc: getTxt('Bilingual financial lessons', 'द्विभाषी वित्तीय पाठ'), color: '#8B7FFF' },
+    { id: 'abhyas', label: getTxt('Abhyas Arena', 'अभ्यास सिमुलेटर'), icon: TrendingUp, desc: getTxt('Virtual stock & MF trading', 'वर्चुअल स्टॉक व म्यूचुअल फंड'), color: '#2CD9C5' },
+    { id: 'hisab', label: getTxt('Hisab Calculator', 'हिसाब कैलकुलेटर'), icon: Calculator, desc: getTxt('SIP, CAGR & LTCG Tax tools', 'एसआईपी व टैक्स कैलकुलेटर'), color: '#06b6d4' },
+    { id: 'bachao', label: getTxt('Scam Shield', 'स्कैम शील्ड'), icon: ShieldAlert, desc: getTxt('Check fraud tips & links', 'स्कैम टिप्स की जांच करें'), color: '#f87171' },
+    { id: 'safalmitra', label: getTxt('SafalMitra AI', 'सफलमित्र AI'), icon: MessageSquare, desc: getTxt('Offline support chatbot', 'ऑफ़लाइन सपोर्ट बोट'), color: '#33D090' },
+    { id: 'leaderboard', label: getTxt('Leaderboard', 'लीडरबोर्ड'), icon: Trophy, desc: getTxt('Top investor rankings', 'शीर्ष निवेशक रैंकिंग'), color: '#F0B84A' }
   ];
 
-  const renderLangSelectorHUD = () => {
-    return (
-      <div style={{
-        position: 'relative',
-        display: 'inline-flex',
-        background: 'rgba(6, 11, 40, 0.6)',
-        border: '1px solid rgba(168, 85, 247, 0.4)',
-        borderRadius: '30px',
-        padding: '3px',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.1)',
-        cursor: 'pointer',
-        alignItems: 'center',
-        userSelect: 'none',
-        perspective: '400px'
-      }}>
-        {/* Sliding Indicator background */}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="perspective-container">
+      
+      {/* 3. HERO SECTION CARD (Senior SaaS Aesthetic) */}
+      <motion.div 
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        style={{
+          position: 'relative',
+          padding: '36px 32px',
+          borderRadius: '20px',
+          background: 'linear-gradient(135deg, #0E1322 0%, #121729 60%, #0A0F1D 100%)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+          overflow: 'hidden',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '24px'
+        }}
+      >
+        {/* Soft Radial Glow Accents */}
         <div style={{
           position: 'absolute',
-          top: '3px',
-          bottom: '3px',
-          left: lang === 'en' ? '3px' : 'calc(50% + 1px)',
-          width: 'calc(50% - 4px)',
-          background: 'linear-gradient(135deg, #a855f7 0%, #06b6d4 100%)',
-          borderRadius: '30px',
-          boxShadow: '0 4px 12px rgba(168, 85, 247, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
-          transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-          zIndex: 1,
-          transform: 'translateZ(6px)',
-          border: '1px solid rgba(255, 255, 255, 0.15)'
+          top: '-30%',
+          left: '10%',
+          width: '380px',
+          height: '380px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(139, 127, 255, 0.14) 0%, transparent 70%)',
+          pointerEvents: 'none',
+          filter: 'blur(50px)'
         }} />
-        
-        {/* Buttons */}
-        <button
-          onClick={() => setLang && setLang('en')}
-          style={{
-            background: 'none',
-            border: 'none',
-            outline: 'none',
-            padding: '6px 18px',
-            fontSize: '0.78rem',
-            fontWeight: '800',
-            color: lang === 'en' ? '#fff' : 'rgba(255,255,255,0.6)',
-            cursor: 'pointer',
-            zIndex: 2,
-            transition: 'color 0.25s',
-            position: 'relative',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}
-        >
-          English
-        </button>
-        <button
-          onClick={() => setLang && setLang('hi')}
-          style={{
-            background: 'none',
-            border: 'none',
-            outline: 'none',
-            padding: '6px 18px',
-            fontSize: '0.78rem',
-            fontWeight: '800',
-            color: lang === 'hi' ? '#fff' : 'rgba(255,255,255,0.6)',
-            cursor: 'pointer',
-            zIndex: 2,
-            transition: 'color 0.25s',
-            position: 'relative',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}
-        >
-          हिन्दी
-        </button>
-      </div>
-    );
-  };
+        <div style={{
+          position: 'absolute',
+          bottom: '-30%',
+          right: '5%',
+          width: '320px',
+          height: '320px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(44, 217, 197, 0.1) 0%, transparent 70%)',
+          pointerEvents: 'none',
+          filter: 'blur(45px)'
+        }} />
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }} className="perspective-container">
-      
-      {/* HEADER COCKPIT SECTION */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '16px',
-        paddingBottom: '12px',
-        borderBottom: '1px solid rgba(168, 85, 247, 0.15)'
-      }}>
-        <div>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: '900', color: '#fff', marginBottom: '4px', textShadow: '0 0 12px rgba(168, 85, 247, 0.45)' }}>
-            {getTxt(`Namaste, ${userName}! 👋`, `नमस्ते, ${userName}! 👋`)}
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          {/* Top Row: Two OUTLINE/tinted Badges (NOT solid fill) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: 'rgba(139, 127, 255, 0.12)',
+              border: '1px solid rgba(139, 127, 255, 0.3)',
+              color: '#A594FF',
+              padding: '4px 12px',
+              borderRadius: '20px',
+              fontSize: '0.75rem',
+              fontWeight: '700'
+            }}>
+              <Zap size={13} fill="#A594FF" />
+              {getTxt(`Sovereign Level ${level}`, `सॉवरेन स्तर ${level}`)}
+            </span>
+
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: 'rgba(44, 217, 197, 0.12)',
+              border: '1px solid rgba(44, 217, 197, 0.3)',
+              color: '#2CD9C5',
+              padding: '4px 12px',
+              borderRadius: '20px',
+              fontSize: '0.75rem',
+              fontWeight: '700'
+            }}>
+              <ShieldCheck size={13} color="#2CD9C5" />
+              {getTxt("100% Offline Secured", "१००% ऑफ़लाइन सुरक्षित")}
+            </span>
+          </div>
+
+          {/* Large Geometric Display Heading (Sora) */}
+          <h2 style={{ 
+            fontFamily: 'Sora, sans-serif',
+            fontSize: '2.2rem', 
+            fontWeight: '800', 
+            color: '#FFFFFF', 
+            margin: '0 0 10px 0', 
+            letterSpacing: '-0.02em',
+            lineHeight: 1.15
+          }}>
+            {getTxt(`Namaste, ${userName} 👋`, `नमस्ते, ${userName} 👋`)}
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.95rem', margin: 0 }}>
-            {getTxt('Welcome back to your sovereign financial headquarters.', 'आपके वित्तीय सुरक्षा और शिक्षा मुख्यालय में आपका स्वागत है।')}
+
+          {/* Constrained Max-Width Subtext */}
+          <p style={{ 
+            color: '#8E9BAE', 
+            fontSize: '0.96rem', 
+            margin: 0, 
+            maxWidth: '580px', 
+            lineHeight: 1.6,
+            fontFamily: 'Inter, sans-serif'
+          }}>
+            {getTxt(
+              'Master virtual portfolios, verify SEBI licenses, and protect your capital from fraudulent chat tips completely offline.',
+              'वर्चुअल पोर्टफोलियो का अभ्यास करें, सेबी लाइसेंस सत्यापित करें और व्हाट्सऐप/टेलीग्राम स्कैम से अपने पैसे सुरक्षित रखें।'
+            )}
           </p>
         </div>
 
-        {/* HUD Switcher & badges */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          {/* Bilingual Switch HUD */}
-          {renderLangSelectorHUD()}
-
-          {/* Daily Streak */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            border: '1.5px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '20px',
-            padding: '8px 18px',
-            color: '#f87171',
-            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)'
-          }}>
-            <Flame size={18} fill="#f87171" style={{ animation: 'pulse 1.5s infinite' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: '800' }}>
-              {streak} {getTxt('Days', 'दिन')}
-            </span>
-          </div>
+        {/* Right CTA Group */}
+        <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          {/* Primary Gradient CTA Button */}
+          <button
+            onClick={() => setCurrentRoute('seekho')}
+            style={{
+              padding: '12px 24px',
+              fontSize: '0.88rem',
+              fontWeight: '700',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #8B7FFF 0%, #6C63F5 100%)',
+              color: '#FFFFFF',
+              border: 'none',
+              outline: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(108, 99, 245, 0.45)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <span>{getTxt("Resume Learning", "अध्ययन जारी रखें")}</span>
+            <ArrowRight size={16} />
+          </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* CORE STATS WIDGETS ROW */}
+      {/* 4. STAT CARDS ROW (3 Cards, 24px padding, 16px borderRadius, #121729 elevated surface) */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -531,197 +330,195 @@ export default function Dashboard({ lang, setLang, completedLessons = [], comple
         position: 'relative',
         zIndex: 2
       }}>
-        {/* Progress Circular Telemetry Dial */}
-        <TiltCard className="holographic-glass glow-breathe" style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '24px 20px' }}>
-          <div style={{
-            position: 'relative', 
-            width: '90px', 
-            height: '90px', 
-            flexShrink: 0,
-            transform: 'translateZ(10px)',
-            filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.45))'
-          }}>
+        {/* Card 1: XP Progress Radial Dial */}
+        <div style={{
+          backgroundColor: '#121729',
+          border: '1px solid rgba(255, 255, 255, 0.07)',
+          borderRadius: '16px',
+          padding: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '20px'
+        }}>
+          <div style={{ position: 'relative', width: '84px', height: '84px', flexShrink: 0 }}>
             <svg style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%' }}>
+              <circle cx="42" cy="42" r="35" stroke="rgba(255, 255, 255, 0.06)" strokeWidth="6" fill="transparent" />
               <circle 
-                cx="45" cy="45" r="38" 
-                stroke="rgba(6, 11, 40, 0.6)" strokeWidth="6" fill="transparent" 
-              />
-              <circle 
-                cx="45" cy="45" r="38" 
-                stroke="url(#dialGrad)" strokeWidth="6" fill="transparent" 
-                strokeDasharray="238.7"
-                strokeDashoffset={238.7 - (238.7 * progressPercent) / 100}
+                cx="42" cy="42" r="35" 
+                stroke="url(#xpSaaSGrad)" strokeWidth="6" fill="transparent" 
+                strokeDasharray="219.9"
+                strokeDashoffset={219.9 - (219.9 * progressPercent) / 100}
                 strokeLinecap="round"
                 style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1)' }}
               />
               <defs>
-                <linearGradient id="dialGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#a855f7" />
-                  <stop offset="100%" stopColor="#06b6d4" />
+                <linearGradient id="xpSaaSGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#8B7FFF" />
+                  <stop offset="100%" stopColor="#2CD9C5" />
                 </linearGradient>
               </defs>
             </svg>
-            <div style={{
-              position: 'absolute', inset: 0, 
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <span style={{ fontSize: '1.25rem', fontWeight: '900', color: '#fff', textShadow: '0 0 8px rgba(6, 182, 212, 0.8)' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: '1.2rem', fontWeight: '800', color: '#FFFFFF' }}>
                 {progressPercent}%
               </span>
             </div>
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '0.72rem', color: '#8E9BAE', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
                 {getTxt('XP Accumulation', 'अनुभव संचय')}
               </span>
               <span style={{
                 fontSize: '0.62rem',
-                backgroundColor: 'rgba(168, 85, 247, 0.15)',
-                color: '#c084fc',
+                backgroundColor: 'rgba(139, 127, 255, 0.15)',
+                color: '#8B7FFF',
                 padding: '2px 8px',
                 borderRadius: '8px',
-                border: '1px solid rgba(168, 85, 247, 0.3)',
+                border: '1px solid rgba(139, 127, 255, 0.3)',
                 fontWeight: '800'
               }}>
                 Lvl {level}
               </span>
             </div>
-            <h4 style={{ fontSize: '1.4rem', fontWeight: '900', color: '#fff', margin: '2px 0 4px' }}>
+            <h4 style={{ fontSize: '1.45rem', fontWeight: '800', color: '#FFFFFF', margin: '2px 0 4px', fontFamily: 'Sora, sans-serif' }}>
               <CountUp end={totalXP} /> XP
             </h4>
-            <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.65)', margin: 0 }}>
+            <p style={{ fontSize: '0.75rem', color: '#8E9BAE', margin: 0 }}>
               {getTxt(`${xpPerLevel - xpInCurrentLevel} XP to Level ${level + 1}`, `स्तर ${level + 1} के लिए ${xpPerLevel - xpInCurrentLevel} XP चाहिए`)}
             </p>
           </div>
-        </TiltCard>
+        </div>
 
-        {/* Portfolio Snapshot Widget */}
-        <TiltCard className="holographic-glass glow-breathe" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '24px 20px' }}>
+        {/* Card 2: Virtual Net Worth */}
+        <div style={{
+          backgroundColor: '#121729',
+          border: '1px solid rgba(255, 255, 255, 0.07)',
+          borderRadius: '16px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
           <div>
-            <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: '700' }}>
+            <span style={{ fontSize: '0.72rem', color: '#8E9BAE', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: '700' }}>
               {getTxt('Virtual Net Worth (Abhyas)', 'आभासी कुल मूल्य (अभ्यास)')}
             </span>
-            <h4 style={{ fontSize: '1.6rem', fontWeight: '900', color: '#fff', margin: '4px 0 2px', textShadow: '0 0 10px rgba(6, 182, 212, 0.2)' }}>
+            <h4 style={{ fontSize: '1.6rem', fontWeight: '800', color: '#FFFFFF', margin: '6px 0 4px', fontFamily: 'Sora, sans-serif' }}>
               <CountUp end={portfolioValue} prefix="₹" />
             </h4>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
             {portfolioReturn >= 0 ? (
-              <span style={{ color: '#22c55e', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '2px', textShadow: '0 0 6px rgba(34,197,94,0.3)' }}>
+              <span style={{ color: '#33D090', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                 ▲ +<CountUp end={portfolioReturn.toFixed(2)} />%
               </span>
             ) : (
-              <span style={{ color: '#ef4444', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '2px', textShadow: '0 0 6px rgba(239,68,68,0.3)' }}>
+              <span style={{ color: '#f87171', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                 ▼ <CountUp end={portfolioReturn.toFixed(2)} />%
               </span>
             )}
-            <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>{getTxt('simulated returns', 'सभी समय का डमी रिटर्न')}</span>
+            <span style={{ color: '#8E9BAE' }}>{getTxt('simulated returns', 'आभासी रिटर्न')}</span>
           </div>
-        </TiltCard>
+        </div>
 
-        {/* Sovereign Portal Card (Continue Learning) */}
-        <TiltCard 
-          className="holographic-glass glow-breathe"
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            justifyContent: 'space-between', 
-            padding: '24px 20px',
-            background: 'radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(217, 119, 6, 0.22) 0%, transparent 70%), rgba(6, 11, 40, 0.45)',
-          }}
-        >
-          <div 
-            ref={portalRef}
-            onMouseMove={handlePortalMouseMove}
-            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flexGrow: 1 }}
-          >
-            <div>
-              {/* Sovereign Portal Header Badge */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.72rem', color: '#fb923c', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '800' }}>
-                  {getTxt('SOVEREIGN PORTAL', 'सॉवरेन पोर्टल')}
-                </span>
-                <span style={{ 
-                  fontSize: '0.62rem', 
-                  color: '#fb923c', 
-                  background: 'rgba(251, 146, 60, 0.1)', 
-                  border: '1.5px solid rgba(251, 146, 60, 0.35)', 
-                  padding: '2px 8px', 
-                  borderRadius: '10px',
-                  fontWeight: '900',
-                  textShadow: '0 0 4px rgba(251, 146, 60, 0.5)'
-                }}>
-                  {getTxt('GOLD CLASS', 'स्वर्ण श्रेणी')}
-                </span>
-              </div>
-
-              {nextLesson ? (
-                <>
-                  <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#fff', margin: '4px 0 2px' }}>
-                    {getTxt(nextLesson.titleEn, nextLesson.titleHi)}
-                  </h4>
-                  <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.65)', margin: 0 }}>
-                    {getTxt(`Next target in ${nextLesson.trackName}`, `${nextLesson.trackName} में अगला पाठ`)}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#fff', margin: '4px 0 2px' }}>
-                    🎉 {getTxt('Curriculum Completed!', 'पाठ्यक्रम पूर्ण!')}
-                  </h4>
-                  <p style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.65)', margin: 0 }}>
-                    {getTxt('Congratulations! You completed all standard modules.', 'बधाई हो! आपने सभी मानक मॉड्यूल पूरे कर लिए हैं।')}
-                  </p>
-                </>
-              )}
+        {/* Card 3: Gold Class / Sovereign Portal (Gold Tinted, NOT Solid) */}
+        <div style={{
+          backgroundColor: '#121729',
+          border: '1px solid rgba(255, 255, 255, 0.07)',
+          borderRadius: '16px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '0.7rem', color: '#8E9BAE', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>
+                {getTxt('SOVEREIGN PORTAL', 'सॉवरेन पोर्टल')}
+              </span>
+              <span style={{ 
+                fontSize: '0.62rem', 
+                color: '#F0B84A', 
+                background: 'rgba(240, 184, 74, 0.12)', 
+                border: '1px solid rgba(240, 184, 74, 0.3)', 
+                padding: '2px 8px', 
+                borderRadius: '8px',
+                fontWeight: '800'
+              }}>
+                GOLD CLASS
+              </span>
             </div>
 
-            {/* Dynamic Progress indicator */}
-            <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.5)' }}>
-                <span>{getTxt('MISSION CHECKPOINT', 'मिशन चेकपॉइंट')}</span>
-                <span>{completedLessons.length} / 9</span>
-              </div>
-              <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                <div style={{ 
-                  width: `${(completedLessons.length / 9) * 100}%`, 
-                  height: '100%', 
-                  background: 'linear-gradient(90deg, #a855f7, #06b6d4)',
-                  boxShadow: '0 0 8px #06b6d4'
-                }} />
-              </div>
-            </div>
+            {nextLesson ? (
+              <>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#FFFFFF', margin: '4px 0 2px', fontFamily: 'Sora, sans-serif' }}>
+                  {getTxt(nextLesson.titleEn, nextLesson.titleHi)}
+                </h4>
+                <p style={{ fontSize: '0.75rem', color: '#8E9BAE', margin: 0 }}>
+                  {getTxt(`Next target in ${nextLesson.trackName}`, `${nextLesson.trackName} में अगला पाठ`)}
+                </p>
+              </>
+            ) : (
+              <>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#FFFFFF', margin: '4px 0 2px', fontFamily: 'Sora, sans-serif' }}>
+                  🎉 {getTxt('Curriculum Completed!', 'पाठ्यक्रम पूर्ण!')}
+                </h4>
+                <p style={{ fontSize: '0.75rem', color: '#8E9BAE', margin: 0 }}>
+                  {getTxt('All standard modules mastered.', 'सभी मानक मॉड्यूल मास्टर कर लिए गए हैं।')}
+                </p>
+              </>
+            )}
+          </div>
 
+          <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ 
+                width: `${(completedLessons.length / 9) * 100}%`, 
+                height: '100%', 
+                background: 'linear-gradient(90deg, #8B7FFF, #2CD9C5)'
+              }} />
+            </div>
             {nextLesson && (
               <button 
-                onClick={() => {
-                  setCurrentRoute('seekho');
-                }}
-                className="btn-3d"
+                onClick={() => setCurrentRoute('seekho')}
                 style={{
-                  alignSelf: 'flex-start',
-                  marginTop: '14px'
+                  background: 'none',
+                  border: 'none',
+                  color: '#8B7FFF',
+                  fontSize: '0.78rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
                 }}
               >
-                {getTxt('Resume Course', 'पाठ पर जाएं')} <ArrowRight size={12} style={{ marginLeft: '4px' }} />
+                {getTxt('Resume', 'पाठ पर जाएं')} <ArrowRight size={12} />
               </button>
             )}
           </div>
-        </TiltCard>
+        </div>
       </div>
 
-      {/* QUICK ACCESS ACTION GRID */}
+      {/* 5. INTERACTIVE PLATFORM MODULES GRID */}
       <div>
-        <h3 style={{ fontSize: '1.25rem', fontWeight: '900', color: '#fff', marginBottom: '16px', textShadow: '0 0 8px rgba(168, 85, 247, 0.3)' }}>
-          {getTxt('Interactive Hub Terminal', 'इंटरएक्टिव हब टर्मिनल')}
-        </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#FFFFFF', margin: 0, fontFamily: 'Sora, sans-serif' }}>
+              {getTxt('Interactive Platform Modules', 'इंटरएक्टिव प्लेटफ़ॉर्म मॉड्यूल')}
+            </h3>
+            <span style={{ fontSize: '0.78rem', color: '#8E9BAE' }}>
+              {getTxt("Explore offline financial tools, trading arenas, and scam detection shields", "ऑफ़लाइन वित्तीय उपकरण, ट्रेडिंग और स्कैम सुरक्षा जांच का अन्वेषण करें")}
+            </span>
+          </div>
+        </div>
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '16px'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '18px'
         }}>
           {quickAccessItems.map(item => {
             const Icon = item.icon;
@@ -729,35 +526,44 @@ export default function Dashboard({ lang, setLang, completedLessons = [], comple
               <button
                 key={item.id}
                 onClick={() => setCurrentRoute(item.id)}
-                className="icon-tile"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '16px',
-                  padding: '18px 20px',
+                  padding: '20px',
                   cursor: 'pointer',
                   width: '100%',
                   textAlign: 'left',
                   outline: 'none',
-                  border: 'none',
-                  color: 'inherit'
+                  border: '1px solid rgba(255, 255, 255, 0.07)',
+                  backgroundColor: '#121729',
+                  borderRadius: '16px',
+                  color: 'inherit',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = `${item.color}60`;
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.07)';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   width: '46px', height: '46px', borderRadius: '12px',
-                  backgroundColor: `${item.color}20`, color: item.color,
-                  filter: `drop-shadow(0 2px 10px ${item.color}45)`,
-                  border: `1px solid ${item.color}40`,
+                  backgroundColor: `${item.color}15`, color: item.color,
+                  border: `1px solid ${item.color}30`,
                   flexShrink: 0
                 }}>
                   <Icon size={22} />
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '0.94rem', fontWeight: '900', color: '#fff', margin: 0 }}>
+                  <h4 style={{ fontSize: '0.96rem', fontWeight: '700', color: '#FFFFFF', margin: 0, fontFamily: 'Sora, sans-serif' }}>
                     {item.label}
                   </h4>
-                  <p style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.5)', margin: '4px 0 0' }}>
+                  <p style={{ fontSize: '0.75rem', color: '#8E9BAE', margin: '4px 0 0', lineHeight: 1.4 }}>
                     {item.desc}
                   </p>
                 </div>
@@ -767,165 +573,78 @@ export default function Dashboard({ lang, setLang, completedLessons = [], comple
         </div>
       </div>
 
-      {/* DATA MANAGEMENT & BACKUP SETTINGS CARD */}
-      <div className="holographic-glass glow-breathe" style={{
-        marginTop: '12px',
-        padding: '24px 20px',
-        zIndex: 2
-      }}>
-        <h3 style={{ fontSize: '1.2rem', color: '#fb923c', fontWeight: '900', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px', textShadow: '0 0 6px rgba(251, 146, 60, 0.4)' }}>
-          ⚙️ {getTxt("Offline Data Management", "ऑफलाइन डेटा प्रबंधन")}
-        </h3>
-        <p style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.65)', margin: '0 0 20px 0', lineHeight: '1.5' }}>
-          {getTxt(
-            "Export or import your user profile, learning progress, simulated portfolios, and settings to a local JSON file.",
-            "अपने यूज़र प्रोफ़ाइल, सीखने की प्रगति, सिमुलेटेड पोर्टफोलियो और सेटिंग्स को स्थानीय JSON फ़ाइल में एक्सपोर्ट या इम्पोर्ट करें।"
-          )}
-        </p>
-
-        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={handleExportData}
-            className="btn-3d"
-            style={{
-              padding: '10px 20px',
-              fontSize: '0.85rem',
-            }}
-          >
-            📥 {getTxt("Export My Data", "डेटा एक्सपोर्ट करें")}
-          </button>
-
-          <div style={{ position: 'relative', overflow: 'hidden', display: 'inline-block' }}>
-            <button
-              type="button"
-              className="btn-3d"
-              style={{
-                padding: '10px 20px',
-                fontSize: '0.85rem',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(255,255,255,0.04)',
-                color: 'rgba(255,255,255,0.8)',
-              }}
-            >
-              📤 {getTxt("Import Data", "डेटा इम्पोर्ट करें")}
-            </button>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImportData}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                opacity: 0,
-                width: '100%',
-                height: '100%',
-                cursor: 'pointer'
-              }}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleToggleNotifications}
-            className="btn-3d"
-            style={{
-              borderColor: notifyEnabled ? '#22c55e' : 'rgba(255,255,255,0.1)',
-              background: notifyEnabled ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)',
-              color: notifyEnabled ? '#22c55e' : 'rgba(255,255,255,0.8)',
-              padding: '10px 20px',
-              fontSize: '0.85rem',
-            }}
-          >
-            🔔 {notifyEnabled ? getTxt("Daily Alerts: ON", "डेली अलर्ट: चालू") : getTxt("Enable Daily Alerts", "डेली अलर्ट चालू करें")}
-          </button>
+      {/* 6. LIVE SEBI & FRAUD TICKER */}
+      <div style={{ padding: '20px 24px', borderRadius: '16px', backgroundColor: '#121729', border: '1px solid rgba(255, 255, 255, 0.07)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#f87171', margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Sora, sans-serif' }}>
+            <ShieldAlert size={16} />
+            {getTxt("Live SEBI Warnings & Fraud Feed", "लाइव सेबी चेतावनियां और धोखाधड़ी अलर्ट")}
+          </h4>
+          <span style={{ fontSize: '0.7rem', color: '#8E9BAE', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Realtime Protection
+          </span>
         </div>
 
-        {/* Profile Switcher Section */}
-        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '20px', marginTop: '20px' }}>
-          <h4 style={{ fontSize: '0.95rem', color: '#fb923c', fontWeight: '900', margin: '0 0 12px 0' }}>
-            👤 {getTxt("User Profile Switcher", "यूज़र प्रोफ़ाइल स्विच करें")}
-          </h4>
-          
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
-            {profiles.map(p => {
-              const isActive = p.id === activeProfileId || (activeProfileId === 'default_profile' && p.id === 'active_user');
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => handleSwitchProfile(p.id)}
-                  className="btn-3d"
-                  style={{
-                    background: isActive ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.04)',
-                    borderColor: isActive ? '#fb923c' : 'rgba(255,255,255,0.1)',
-                    color: isActive ? '#fb923c' : 'rgba(255,255,255,0.8)',
-                    padding: '8px 16px',
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  {p.name} ({p.xp} XP)
-                </button>
-              );
-            })}
-            
-            <button
-              type="button"
-              onClick={() => setShowCreateProfile(!showCreateProfile)}
-              className="btn-3d"
-              style={{
-                background: 'rgba(34,197,94,0.15)',
-                borderColor: '#22c55e',
-                color: '#22c55e',
-                padding: '8px 16px',
-                fontSize: '0.8rem',
-              }}
-            >
-              ➕ {getTxt("New Profile", "नया प्रोफाइल")}
-            </button>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '14px'
+        }}>
+          <div style={{
+            padding: '14px 16px',
+            borderRadius: '12px',
+            backgroundColor: 'rgba(248, 113, 113, 0.08)',
+            border: '1px solid rgba(248, 113, 113, 0.2)'
+          }}>
+            <span style={{ fontSize: '0.68rem', color: '#f87171', fontWeight: '800', textTransform: 'uppercase' }}>
+              ⚠️ SEBI Circular Alert
+            </span>
+            <h5 style={{ fontSize: '0.88rem', color: '#FFFFFF', margin: '4px 0', fontWeight: '700' }}>
+              {getTxt("Beware of Unregistered Telegram Investment Channels", "अपंजीकृत टेलीग्राम निवेश चैनलों से सावधान रहें")}
+            </h5>
+            <p style={{ fontSize: '0.75rem', color: '#8E9BAE', margin: 0 }}>
+              {getTxt("SEBI warns against entities claiming 100% guaranteed returns or asking for advance registration fees.", "सेबी १००% गारंटीकृत रिटर्न का दावा करने वाली या अग्रिम शुल्क मांगने वाली संस्थाओं के खिलाफ चेतावनी देता है।")}
+            </p>
           </div>
 
-          {showCreateProfile && (
-            <form onSubmit={handleCreateProfile} style={{ display: 'flex', gap: '10px', maxWidth: '400px', marginTop: '12px' }}>
-              <input
-                type="text"
-                placeholder={getTxt("Enter profile name...", "प्रोफ़ाइल नाम दर्ज करें...")}
-                value={newProfileName}
-                onChange={e => setNewProfileName(e.target.value)}
-                style={{
-                  flex: 1,
-                  backgroundColor: 'rgba(6, 11, 40, 0.6)',
-                  border: '1px solid rgba(168, 85, 247, 0.4)',
-                  borderRadius: '12px',
-                  color: '#fff',
-                  padding: '10px 16px',
-                  fontSize: '0.85rem',
-                  outline: 'none'
-                }}
-              />
-              <button
-                type="submit"
-                className="btn-3d"
-                style={{
-                  padding: '8px 18px',
-                  fontSize: '0.82rem',
-                }}
-              >
-                {getTxt("Create", "बनाएं")}
-              </button>
-            </form>
-          )}
+          <div style={{
+            padding: '14px 16px',
+            borderRadius: '12px',
+            backgroundColor: 'rgba(251, 146, 60, 0.08)',
+            border: '1px solid rgba(251, 146, 60, 0.2)'
+          }}>
+            <span style={{ fontSize: '0.68rem', color: '#FB923C', fontWeight: '800', textTransform: 'uppercase' }}>
+              🔍 Verify RIA Registration
+            </span>
+            <h5 style={{ fontSize: '0.88rem', color: '#FFFFFF', margin: '4px 0', fontWeight: '700' }}>
+              {getTxt("Always Check SEBI RIA Registration Number", "हमेशा सेबी RIA पंजीकरण संख्या की जाँच करें")}
+            </h5>
+            <p style={{ fontSize: '0.75rem', color: '#8E9BAE', margin: 0 }}>
+              {getTxt("Use our integrated SEBI Lookup tool to confirm if your advisor is genuinely licensed by SEBI.", "यह पुष्टि करने के लिए कि आपका सलाहकार वास्तव में सेबी द्वारा लाइसेंस प्राप्त है, सेबी खोज उपकरण का उपयोग करें।")}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 7. BOTTOM OFFLINE DATA MANAGEMENT FOOTER */}
+      <div style={{ padding: '24px 28px', borderRadius: '16px', backgroundColor: '#121729', border: '1px solid rgba(255, 255, 255, 0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h4 style={{ fontSize: '1.05rem', color: '#33D090', fontWeight: '800', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Sora, sans-serif' }}>
+            ☁️ {getTxt("Cloud Sync Active", "क्लाउड सिंक सक्रिय")}
+          </h4>
+          <p style={{ fontSize: '0.82rem', color: '#8E9BAE', margin: 0 }}>
+            {getTxt("Your progress is automatically saved securely to the cloud.", "आपकी प्रगति स्वचालित रूप से क्लाउड पर सुरक्षित रूप से सहेजी जाती है।")}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+
+          <button onClick={onOpenProfileModal} className="btn-3d" style={{ padding: '8px 18px', fontSize: '0.82rem', background: 'rgba(139, 127, 255, 0.15)', color: '#8B7FFF', border: '1px solid rgba(139, 127, 255, 0.3)' }}>
+            ⚙️ {getTxt("Full Settings", "पूर्ण सेटिंग्स")}
+          </button>
         </div>
       </div>
       
-      {/* CSS Animation keyframes */}
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.08); }
-        }
-      `}</style>
     </div>
   );
 }

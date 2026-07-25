@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Toaster } from 'react-hot-toast';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import Navbar from './components/Navbar';
 import Abhyas from './components/Abhyas';
 import ScamMeter from './components/ScamMeter';
-import SEBILookup from './components/SEBILookup';
 import GlossaryTerm from './components/GlossaryTerm';
 import SafalMitraChatbot from './components/SafalMitraChatbot';
 import InteractiveCalculator from './components/InteractiveCalculator';
@@ -14,6 +14,11 @@ import DisclaimerBanner from './components/DisclaimerBanner';
 import LandingScreen from './components/LandingScreen';
 import Dashboard from './components/Dashboard';
 import Leaderboard from './components/Leaderboard';
+import ProfileModal from './components/ProfileModal';
+import LoginScreen from './components/LoginScreen';
+import CommandPalette from './components/CommandPalette';
+import { useAuth } from './context/AuthContext';
+import { getUserProfile, updateUserProfile } from './services/db';
 import { tracks, glossary, trackQuizzes } from './data/lessons';
 import { stockKnowledge } from './data/stockKnowledge';
 import { officialTestTemplates } from './data/scamRules';
@@ -46,27 +51,32 @@ const sebiAlerts = [
 ];
 
 export default function App() {
+  const { currentUser, logout } = useAuth();
   const [currentRoute, setCurrentRoute] = useState('home');
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [lang, setLang] = useState('en');
   const [scamMeterInitialText, setScamMeterInitialText] = useState('');
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [userName, setUserName] = useState('Investor');
+  const [profiles, setProfiles] = useState([{ id: 'default_profile', name: 'Investor', xp: 150, created_at: new Date().toLocaleDateString('en-IN'), data: {} }]);
+  const [activeProfileId, setActiveProfileId] = useState('default_profile');
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
 
   // Splash screen: show on every app startup for premium landing experience
   const [splashDone, setSplashDone] = useState(false);
 
   // Onboarding: show once per device
-  const [onboardingDone, setOnboardingDone] = useState(() => {
-    return localStorage.getItem('safalniveshak_onboarded') === 'true';
-  });
+  const [onboardingDone, setOnboardingDone] = useState(false);
 
-  const handleOnboardingComplete = (route) => {
-    localStorage.setItem('safalniveshak_onboarded', 'true');
+  const handleOnboardingComplete = async (route) => {
     setOnboardingDone(true);
+    if (currentUser) {
+      await updateUserProfile(currentUser.uid, { onboarded: true });
+    }
     if (route && route !== 'home') setCurrentRoute(route);
   };
   
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('safalniveshak_theme') || 'light';
-  });
+  const [theme, setTheme] = useState('light');
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -122,34 +132,16 @@ export default function App() {
   const [activeTrackId, setActiveTrackId] = useState('beginner'); // 'beginner', 'intermediate', 'safety'
   
   // Progress states — seed demo data for first-time visitors so Passbook looks populated
-  const [completedLessons, setCompletedLessons] = useState(() => {
-    const saved = localStorage.getItem('safalniveshak_lessons');
-    if (saved) return JSON.parse(saved);
-    // Demo seed: first 3 beginner lessons pre-completed
-    return [1, 2, 3];
-  });
-
-  const [scanHistory, setScanHistory] = useState(() => {
-    const saved = localStorage.getItem('safalniveshak_history');
-    if (saved) return JSON.parse(saved);
-    // Demo seed: 1 scam scan so Passbook has content
-    return [{
+  // Progress states
+  const [completedLessons, setCompletedLessons] = useState([1, 2, 3]);
+  const [scanHistory, setScanHistory] = useState([{
       textSnippet: "🚀 JACKPOT CALL: 100% guaranteed profit in 10 days...",
       score: 91,
       verdict: 'HIGH',
       date: new Date().toLocaleDateString('en-IN')
-    }];
-  });
-
-  const [completedTracks, setCompletedTracks] = useState(() => {
-    const saved = localStorage.getItem('safalniveshak_tracks');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [helpfulFeedback, setHelpfulFeedback] = useState(() => {
-    const saved = localStorage.getItem('safalniveshak_feedback');
-    return saved ? JSON.parse(saved) : {};
-  });
+  }]);
+  const [completedTracks, setCompletedTracks] = useState([]);
+  const [helpfulFeedback, setHelpfulFeedback] = useState({});
 
   // Search filter for Glossary
   const [glossaryQuery, setGlossaryQuery] = useState('');
@@ -158,24 +150,39 @@ export default function App() {
   // Crowdsourced scam feed states
   const [reportedScams, setReportedScams] = useState([]);
 
-  // Fetch Passbook from SQLite server on mount
+  // Fetch Cloud State from Firestore on mount if authenticated
   useEffect(() => {
-    const syncPassbookFromBackend = async () => {
-      try {
-        const response = await fetch("http://localhost:5000/api/passbook/sandbox_user");
-        if (response.ok) {
-          const data = await response.json();
-          if (data.completedLessons) setCompletedLessons(data.completedLessons);
-          if (data.completedTracks) setCompletedTracks(data.completedTracks);
-          if (data.scanHistory) setScanHistory(data.scanHistory);
-          console.log("Synced Passbook ledger history from SQLite database");
+    const fetchUserData = async () => {
+      if (currentUser) {
+        const profile = await getUserProfile(currentUser.uid);
+        if (profile) {
+          if (profile.name) setUserName(profile.name);
+          if (profile.theme) setTheme(profile.theme);
+          if (profile.onboarded !== undefined) setOnboardingDone(profile.onboarded);
+          if (profile.completedLessons) setCompletedLessons(profile.completedLessons);
+          if (profile.scanHistory) setScanHistory(profile.scanHistory);
+          if (profile.completedTracks) setCompletedTracks(profile.completedTracks);
         }
-      } catch (err) {
-        console.warn("SQLite API Server offline, using local localStorage fallback:", err.message);
       }
     };
-    syncPassbookFromBackend();
+    fetchUserData();
+  }, [currentUser]);
+
+  // Global Command Palette Shortcut
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
+
+  const triggerSearchFromDashboard = () => {
+    setIsCommandPaletteOpen(true);
+  };
 
   // Fetch crowdsourced reported scams feed on home page routing
   useEffect(() => {
@@ -219,20 +226,28 @@ export default function App() {
   }, [currentRoute]);
 
   useEffect(() => {
-    localStorage.setItem('safalniveshak_lessons', JSON.stringify(completedLessons));
-  }, [completedLessons]);
+    if (currentUser) {
+      updateUserProfile(currentUser.uid, { completedLessons });
+    }
+  }, [completedLessons, currentUser]);
 
   useEffect(() => {
-    localStorage.setItem('safalniveshak_history', JSON.stringify(scanHistory));
-  }, [scanHistory]);
+    if (currentUser) {
+      updateUserProfile(currentUser.uid, { scanHistory });
+    }
+  }, [scanHistory, currentUser]);
 
   useEffect(() => {
-    localStorage.setItem('safalniveshak_tracks', JSON.stringify(completedTracks));
-  }, [completedTracks]);
+    if (currentUser) {
+      updateUserProfile(currentUser.uid, { completedTracks });
+    }
+  }, [completedTracks, currentUser]);
 
   useEffect(() => {
-    localStorage.setItem('safalniveshak_feedback', JSON.stringify(helpfulFeedback));
-  }, [helpfulFeedback]);
+    if (currentUser) {
+      updateUserProfile(currentUser.uid, { helpfulFeedback });
+    }
+  }, [helpfulFeedback, currentUser]);
 
   // Audio Playback states for Seekho
   const [activeLessonId, setActiveLessonId] = useState(null);
@@ -325,10 +340,6 @@ export default function App() {
       setScanHistory([]);
       setCompletedTracks([]);
       setHelpfulFeedback({});
-      localStorage.removeItem('safalniveshak_lessons');
-      localStorage.removeItem('safalniveshak_history');
-      localStorage.removeItem('safalniveshak_tracks');
-      localStorage.removeItem('safalniveshak_feedback');
       setActiveLessonId(null);
       setExamActive(false);
       setExamFinished(false);
@@ -433,18 +444,141 @@ export default function App() {
     return g.term.toLowerCase().includes(q) || g.defEn.toLowerCase().includes(q) || g.defHi.toLowerCase().includes(q);
   });
 
+  const handleExportData = () => {
+    const keys = [
+      'safalniveshak_username',
+      'safalniveshak_lessons',
+      'safalniveshak_tracks',
+      'safalniveshak_history',
+      'safalniveshak_feedback',
+      'safalniveshak_portfolio',
+      'safalniveshak_mf_portfolio',
+      'safalniveshak_profiles',
+      'safalniveshak_active_profile_id',
+      'safalniveshak_avatar'
+    ];
+    const backup = {};
+    keys.forEach(k => {
+      const val = localStorage.getItem(k);
+      if (val !== null) backup[k] = val;
+    });
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SafalNiveshak_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        Object.keys(data).forEach(key => {
+          localStorage.setItem(key, data[key]);
+        });
+        alert(lang === 'en' ? 'Data imported successfully! Reloading...' : 'डेटा सफलतापूर्वक इम्पोर्ट किया गया! रीलोड हो रहा है...');
+        window.location.reload();
+      } catch (err) {
+        alert(lang === 'en' ? 'Failed to parse backup JSON.' : 'बैकअप फ़ाइल लोड करने में असमर्थ।');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleSwitchProfile = (targetId) => {
+    if (targetId === activeProfileId) return;
+    const targetProf = profiles.find(p => p.id === targetId);
+    if (targetProf && targetProf.data) {
+      Object.keys(targetProf.data).forEach(key => {
+        if (targetProf.data[key] !== null) {
+          localStorage.setItem(key, targetProf.data[key]);
+        }
+      });
+    }
+    localStorage.setItem('safalniveshak_active_profile_id', targetId);
+    window.location.reload();
+  };
+
+  const handleCreateProfile = (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const input = form.querySelector('input');
+    const name = input ? input.value.trim() : '';
+    if (!name) return;
+    const newId = 'profile_' + Date.now();
+    const freshData = {
+      safalniveshak_username: name,
+      safalniveshak_lessons: '[]',
+      safalniveshak_tracks: '[]',
+      safalniveshak_history: '[]'
+    };
+    const updatedProfiles = [...profiles, { id: newId, name, xp: 0, created_at: new Date().toLocaleDateString('en-IN'), data: freshData }];
+    setProfiles(updatedProfiles);
+    localStorage.setItem('safalniveshak_profiles', JSON.stringify(updatedProfiles));
+    localStorage.setItem('safalniveshak_active_profile_id', newId);
+    Object.keys(freshData).forEach(k => localStorage.setItem(k, freshData[k]));
+    window.location.reload();
+  };
+
+  const handleToggleNotifications = async () => {
+    if (notifyEnabled) {
+      setNotifyEnabled(false);
+      localStorage.setItem('safalniveshak_notifications_enabled', 'false');
+      return;
+    }
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        setNotifyEnabled(true);
+        localStorage.setItem('safalniveshak_notifications_enabled', 'true');
+      }
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', position: 'relative' }}>
+      <Toaster 
+        position="bottom-center"
+        toastOptions={{
+          style: {
+            background: 'var(--bg-surface-elevated)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-color)',
+          },
+        }}
+      />
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={(route) => {
+          if (route.action === 'OPEN_PROFILE') {
+            setIsProfileModalOpen(true);
+          } else if (route.path) {
+            setCurrentRoute(route.path);
+          }
+        }}
+      />
       {/* Premium Animated Landing/Splash Screen */}
       {!splashDone && (
         <LandingScreen lang={lang} setLang={setLang} onDone={() => setSplashDone(true)} />
       )}
+      {/* Authentication */}
+      {splashDone && !currentUser && (
+        <LoginScreen lang={lang} getTxt={getTxt} />
+      )}
       {/* Onboarding wizard */}
-      {splashDone && !onboardingDone && (
+      {splashDone && currentUser && !onboardingDone && (
         <OnboardingFlow lang={lang} onComplete={handleOnboardingComplete} />
       )}
-      {/* Main App Layout (Visible only after Splash and Onboarding are completed) */}
-      {splashDone && onboardingDone && (
+      {/* Main App Layout (Visible only after Splash, Auth, and Onboarding are completed) */}
+      {splashDone && currentUser && onboardingDone && (
         <>
           <DisclaimerBanner lang={lang} />
           <Navbar 
@@ -454,6 +588,39 @@ export default function App() {
             setLang={setLang}
             theme={theme}
             setTheme={setTheme}
+            userName={userName}
+            completedLessons={completedLessons}
+            completedTracks={completedTracks}
+            scanHistory={scanHistory}
+            streak={3}
+            onOpenProfileModal={() => setIsProfileModalOpen(true)}
+          />
+          <ProfileModal 
+            isOpen={isProfileModalOpen}
+            onClose={() => setIsProfileModalOpen(false)}
+            userName={userName}
+            setUserName={setUserName}
+            lang={lang}
+            setLang={setLang}
+            theme={theme}
+            setTheme={setTheme}
+            completedLessons={completedLessons}
+            completedTracks={completedTracks}
+            scanHistory={scanHistory}
+            profiles={profiles}
+            activeProfileId={activeProfileId}
+            onSwitchProfile={handleSwitchProfile}
+            onCreateProfile={handleCreateProfile}
+            onExportData={handleExportData}
+            onImportData={handleImportData}
+            notifyEnabled={notifyEnabled}
+            onToggleNotifications={handleToggleNotifications}
+            onLogout={async () => {
+              setIsProfileModalOpen(false);
+              await logout();
+              window.location.reload();
+            }}
+            getTxt={getTxt}
           />
           <main style={{ flexGrow: 1, padding: currentRoute === 'abhyas' ? '0' : '40px 0' }} className={currentRoute === 'abhyas' ? "" : "container"}>
         
@@ -467,6 +634,8 @@ export default function App() {
             scanHistory={scanHistory}
             setCurrentRoute={setCurrentRoute}
             getTxt={getTxt}
+            onOpenProfileModal={() => setIsProfileModalOpen(true)}
+            onGlobalSearch={triggerSearchFromDashboard}
           />
         )}
 
@@ -508,221 +677,10 @@ export default function App() {
         {currentRoute === 'bachao' && (
           <ScamMeter 
             lang={lang} 
-            onNavigateToSebi={() => setCurrentRoute('sebi')} 
             onAddHistory={handleAddScanHistory}
             initialText={scamMeterInitialText}
             clearInitialText={() => setScamMeterInitialText('')}
           />
-        )}
-
-        {/* Route 4: SEBI Registered Advisors Lookup */}
-        {currentRoute === 'sebi' && (
-          <SEBILookup lang={lang} />
-        )}
-
-        {/* Route 5: Passbook */}
-        {currentRoute === 'passbook' && (
-          <div>
-            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <h2 style={{ fontSize: '2rem', color: 'var(--text-primary)' }}>
-                {getTxt("Niveshak Passbook Ledger", "निवेशक पासबुक लेजर")}
-              </h2>
-              <p style={{ color: 'var(--text-secondary)', maxWidth: '600px', margin: '8px auto 0' }}>
-                {getTxt(
-                  "Your verified educational achievements and scanned risk transactions, formatted as an official passbook record.",
-                  "आपके सत्यापित शैक्षणिक रिकॉर्ड और स्कैन किए गए जोखिम लेनदेन, जो एक पासबुक लेजर के रूप में व्यवस्थित हैं।"
-                )}
-              </p>
-            </div>
-
-            <div className="ledger-card" style={{
-              backgroundColor: 'var(--bg-surface-paper)',
-              border: '2px solid var(--border-color)',
-              borderRadius: '4px',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-              backgroundImage: 'linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px)',
-              backgroundSize: '100% 12px'
-            }}>
-              
-              <div style={{
-                padding: '24px 20px',
-                borderBottom: '2px dashed var(--border-color)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '20px',
-                backgroundColor: 'rgba(0,0,0,0.15)'
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <div>
-                    <span className="ticket-label" style={{ display: 'block', fontSize: '0.65rem' }}>{getTxt("LEDGER HOLDER NAME", "लेजर धारक का नाम")}</span>
-                    <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{getTxt("SANDBOX INVESTOR", "सैंडबॉक्स निवेशक")}</strong>
-                  </div>
-                  <div>
-                    <span className="ticket-label" style={{ display: 'block', fontSize: '0.65rem' }}>{getTxt("PASSBOOK ACCOUNT NO.", "पासबुक खाता संख्या")}</span>
-                    <strong className="numeric-data" style={{ color: 'var(--color-amber)', fontSize: '0.95rem' }}>SN-2026-9482-OFFLINE</strong>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'right' }}>
-                  <div>
-                    <span className="ticket-label" style={{ display: 'block', fontSize: '0.65rem' }}>{getTxt("REGULATION CREDENTIALS", "विनियामक साक्ष्य")}</span>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                      {completedTracks.length === 3 
-                        ? getTxt("FULL SAFETY CERTIFIED", "पूर्ण सुरक्षा प्रमाणित") 
-                        : getTxt(`AUDIT IN PROGRESS (${completedTracks.length}/3 CLEARED)`, `ऑडिट जारी (${completedTracks.length}/३ उत्तीर्ण)`)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="ticket-label" style={{ display: 'block', fontSize: '0.65rem' }}>{getTxt("LEDGER RESET ACTION", "लेजर रीसेट कार्रवाई")}</span>
-                    <button 
-                      onClick={handleResetPassbook} 
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--color-red)',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        textDecoration: 'underline',
-                        padding: 0
-                      }}
-                    >
-                      [ {getTxt("Format Passbook", "पासबुक खाली करें")} ]
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="ledger-body" style={{ padding: 0 }}>
-                <table className="ledger-table" style={{ width: '100%' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}>
-                      <th style={{ padding: '12px 16px', width: '120px' }}>{getTxt("DATE / दिनांक", "DATE / दिनांक")}</th>
-                      <th style={{ padding: '12px 16px', width: '100px' }}>{getTxt("CODE / कोड", "CODE / कोड")}</th>
-                      <th style={{ padding: '12px 16px' }}>{getTxt("TRANSACTION DETAILS / लेजर विवरण", "TRANSACTION DETAILS / लेजर विवरण")}</th>
-                      <th style={{ padding: '12px 16px', width: '120px' }}>{getTxt("VALUE / सूचकांक", "VALUE / सूचकांक")}</th>
-                      <th style={{ padding: '12px 16px', width: '140px', textAlign: 'center' }}>{getTxt("LEDGER SEAL / मोहर", "LEDGER SEAL / मोहर")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {completedLessons.map((lId) => {
-                      let lesson = null;
-                      tracks.forEach(t => {
-                        const l = t.lessons.find(x => x.id === lId);
-                        if (l) lesson = l;
-                      });
-                      if (!lesson) return null;
-                      return (
-                        <tr key={`l-${lId}`}>
-                          <td className="numeric-data" style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>09/07/2026</td>
-                          <td className="numeric-data" style={{ padding: '12px 16px', color: 'var(--color-amber)' }}>EDU-LN{lId < 10 ? `0${lId}` : lId}</td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: '600' }}>{getTxt(lesson.titleEn, lesson.titleHi)}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{getTxt("Passed offline reading checklist", "ऑफ़लाइन पठन चेकलिस्ट पूर्ण")}</div>
-                          </td>
-                          <td style={{ padding: '12px 16px', fontWeight: 'bold', color: 'var(--color-gold)' }}>PASSED</td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <span style={{
-                              border: '1px solid var(--color-gold)',
-                              borderRadius: '3px',
-                              color: 'var(--color-gold)',
-                              padding: '2px 6px',
-                              fontSize: '0.7rem',
-                              fontWeight: '800',
-                              textTransform: 'uppercase'
-                            }}>
-                              ★ Passed
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {completedTracks.map((tId) => {
-                      const track = tracks.find(t => t.id === tId);
-                      return (
-                        <tr key={`t-${tId}`} style={{ backgroundColor: 'rgba(212, 175, 55, 0.03)' }}>
-                          <td className="numeric-data" style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>09/07/2026</td>
-                          <td className="numeric-data" style={{ padding: '12px 16px', color: 'var(--color-gold)' }}>
-                            EXAM-{tId === 'beginner' ? 'BGR' : (tId === 'intermediate' ? 'INT' : 'SFT')}
-                          </td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: 'bold', color: 'var(--color-gold)' }}>
-                              {getTxt(`Certification: ${track.titleEn}`, `प्रमाणन: ${track.titleHi}`)}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                              {getTxt("Cleared SEBI compliance audit test", "सेबी अनुपालन ऑडिट परीक्षा उत्तीर्ण की")}
-                            </div>
-                          </td>
-                          <td style={{ padding: '12px 16px', fontWeight: 'bold', color: 'var(--color-gold)' }}>100% OK</td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <span style={{
-                              border: '2px double var(--color-gold)',
-                              color: 'var(--color-gold)',
-                              padding: '2px 8px',
-                              fontSize: '0.65rem',
-                              fontWeight: '900',
-                              textTransform: 'uppercase',
-                              backgroundColor: 'rgba(212, 175, 55, 0.05)',
-                              display: 'inline-block',
-                              transform: 'rotate(-2deg)'
-                            }}>
-                              ★ APPROVED
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {scanHistory.map((scan, idx) => {
-                      const isHigh = scan.verdict === 'HIGH';
-                      const isLow = scan.verdict === 'LOW';
-                      return (
-                        <tr key={`s-${idx}`}>
-                          <td className="numeric-data" style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{scan.date}</td>
-                          <td className="numeric-data" style={{ padding: '12px 16px', color: '#8FA0B5' }}>SCAM-CHK</td>
-                          <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontStyle: 'italic', color: 'var(--text-primary)' }}>"{scan.textSnippet}"</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{getTxt("Pasted solicitations pattern scan", "फॉरवर्ड संदेश सुरक्षा ऑडिट")}</div>
-                          </td>
-                          <td className="numeric-data" style={{ padding: '12px 16px', color: isHigh ? 'var(--color-red)' : (isLow ? 'var(--color-green)' : 'var(--color-amber)') }}>
-                            Index: {scan.score}/100
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <span style={{
-                              border: '1px solid',
-                              borderColor: isHigh ? 'var(--color-red)' : (isLow ? 'var(--color-green)' : 'var(--color-amber)'),
-                              color: isHigh ? 'var(--color-red)' : (isLow ? 'var(--color-green)' : 'var(--color-amber)'),
-                              borderRadius: '3px',
-                              padding: '2px 6px',
-                              fontSize: '0.7rem',
-                              fontWeight: '800',
-                              textTransform: 'uppercase',
-                              backgroundColor: isHigh ? 'rgba(211,78,54,0.05)' : (isLow ? 'rgba(46,125,99,0.05)' : 'rgba(217,142,4,0.05)')
-                            }}>
-                              {isHigh ? '⚠ Blocked' : (isLow ? '✓ Secure' : '⚠ Caution')}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {completedLessons.length === 0 && completedTracks.length === 0 && scanHistory.length === 0 && (
-                      <tr>
-                        <td colSpan="5" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          {getTxt(
-                            "No ledger logs found. Complete lessons in 'Seekho' or audit tips in 'Bachao' to print entries.",
-                            "कोई लेजर प्रविष्टियां नहीं मिलीं। सीखो में पाठ पूरा करें या बचाओ में संदेश की जांच करें।"
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-            </div>
-          </div>
         )}
 
         {/* Route 5.5: SafalMitra Chatbot */}
@@ -730,36 +688,36 @@ export default function App() {
           <SafalMitraChatbot lang={lang} theme={theme} />
         )}
 
-        {/* Route: Calculator (SIP, Comparison, Inflation, LTCG/STCG Tax) */}
+        {/* Route: Calculator (Step-Up SIP, Comparison, Inflation, LTCG/STCG Tax) */}
         {currentRoute === 'hisab' && (() => {
-          const [calcTab, setCalcTab] = React.useState('sip');
+          const [calcTab, setCalcTab] = React.useState('stepup_sip');
           const calcTabs = [
-            { id: 'sip', label: getTxt('SIP Wealth', 'SIP धन'), icon: '📈' },
+            { id: 'stepup_sip', label: getTxt('Step-Up SIP', 'स्टेप-अप SIP'), icon: '📈' },
             { id: 'comparison', label: getTxt('FD vs SIP', 'FD vs SIP'), icon: '⚖️' },
-            { id: 'inflation', label: getTxt('Inflation', 'मुद्रास्फीति'), icon: '📉' },
-            { id: 'tax', label: getTxt('Tax (LTCG/STCG)', 'कर (LTCG/STCG)'), icon: '🧾' },
+            { id: 'inflation', label: getTxt('Inflation Erosion', 'मुद्रास्फीति क्षरण'), icon: '📉' },
+            { id: 'tax', label: getTxt('LTCG/STCG Tax', 'कर (LTCG/STCG)'), icon: '🧾' },
           ];
           return (
             <div>
-              <div style={{ marginBottom: '28px' }}>
-                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '6px' }}>
-                  🧮 {getTxt('Financial Calculators', 'वित्तीय कैलकुलेटर')}
+              <div style={{ marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#FFFFFF', marginBottom: '6px', fontFamily: 'Sora, sans-serif' }}>
+                  🧮 {getTxt('Hisab Visual Wealth & Tax Terminal', 'हिसाब विजुअल वेल्थ व टैक्स टर्मिनल')}
                 </h2>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-                  {getTxt('Plan your investments with precision. All calculations are offline.', 'अपने निवेश की सटीक योजना बनाएं। सभी गणनाएं ऑफलाइन हैं।')}
+                <p style={{ color: '#8E9BAE', fontSize: '0.95rem' }}>
+                  {getTxt('Simulate compounding, inflation erosion, and Union Budget 2024 tax optimization offline.', 'कंपाउंडिंग, महंगाई क्षरण और बजट २०२४ कर बचत का ऑफ़लाइन सिमुलेशन करें।')}
                 </p>
               </div>
               {/* Tab Bar */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
                 {calcTabs.map(t => (
                   <button key={t.id} onClick={() => setCalcTab(t.id)} style={{
-                    padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                    fontSize: '0.85rem', fontWeight: '600', transition: 'all 0.2s',
+                    padding: '10px 20px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+                    fontSize: '0.85rem', fontWeight: '700', transition: 'all 0.2s',
                     background: calcTab === t.id
-                      ? 'linear-gradient(135deg, #7c3aed, #2563eb)'
-                      : 'rgba(255,255,255,0.05)',
-                    color: calcTab === t.id ? '#fff' : 'var(--text-secondary)',
-                    boxShadow: calcTab === t.id ? '0 4px 12px rgba(124,58,237,0.3)' : 'none',
+                      ? 'linear-gradient(135deg, #8B7FFF, #6C63F5)'
+                      : 'rgba(255,255,255,0.04)',
+                    color: calcTab === t.id ? '#fff' : '#8E9BAE',
+                    boxShadow: calcTab === t.id ? '0 4px 16px rgba(108, 99, 245, 0.4)' : 'none',
                   }}>
                     {t.icon} {t.label}
                   </button>

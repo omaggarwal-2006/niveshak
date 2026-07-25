@@ -1,36 +1,39 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-base: #FAFAF7; /* Soft warm-neutral off-white */
-  --bg-surface: #FFFFFF; /* Pure white card surface */
-  --bg-surface-elevated: #FFFFFF;
-  --bg-surface-light: #F4F3EE;
-  --bg-surface-paper: #FAFAF7;
-  --border-color: #E8E6E1; /* Warm divider hairlines */
+  --bg-base: #080B14; /* Deep navy / near-black */
+  --bg-surface: #121729; /* Elevated dark surface */
+  --bg-surface-elevated: #161D33;
+  --bg-surface-light: #1A223B;
+  --bg-surface-paper: #0F1424;
+  --border-color: rgba(255, 255, 255, 0.07);
   
-  --text-primary: #0A1C30; /* Much darker navy ink for high contrast */
-  --text-secondary: #2C3E52; /* Darker slate secondary text */
-  --text-tertiary: #5E7288; /* Darker tertiary slate for locked/inactive items */
+  --text-primary: #FFFFFF;
+  --text-secondary: #8E9BAE;
+  --text-tertiary: #5A687D;
   
-  --color-red: #C0392B; /* Serious deep red risk warning */
-  --color-amber: #B87A03; /* Accessible amber accent */
-  --color-green: #3D7A5D; /* Deep sage green */
-  --color-gold: #B8860B; /* Deep gold */
+  --color-indigo: #8B7FFF;
+  --color-indigo-dark: #6C63F5;
+  --color-teal: #2CD9C5;
+  --color-gold-tint: #F0B84A;
+  --color-green: #33D090;
+  --color-orange: #FB923C;
+  --color-red: #F87171;
   
-  --grid-color: rgba(15, 44, 76, 0.012);
+  --grid-color: rgba(255, 255, 255, 0.015);
   
-  --font-display: 'Inter', sans-serif;
-  --font-body: 'Noto Sans Devanagari', 'Inter', sans-serif;
+  --font-display: 'Sora', 'Inter', sans-serif;
+  --font-body: 'Inter', 'Noto Sans Devanagari', sans-serif;
 
-  /* 3D Glass variables (Light theme defaults) */
-  --bg-glass: rgba(255, 255, 255, 0.7);
-  --border-glass: rgba(0, 0, 0, 0.06);
-  --highlight-glass: rgba(255, 255, 255, 0.6);
-  --shadow-ambient: 0 16px 40px rgba(0, 0, 0, 0.02);
-  --shadow-contact: 0 4px 10px rgba(0, 0, 0, 0.05);
-  --btn-border: rgba(0, 0, 0, 0.08);
-  --btn-bg: linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(240,240,240,0.85) 100%);
-  --btn-highlight: rgba(255, 255, 255, 0.8);
+  /* SaaS 3D Glass variables */
+  --bg-glass: rgba(18, 23, 41, 0.7);
+  --border-glass: rgba(255, 255, 255, 0.07);
+  --highlight-glass: rgba(255, 255, 255, 0.04);
+  --shadow-ambient: 0 16px 40px rgba(0, 0, 0, 0.4);
+  --shadow-contact: 0 4px 10px rgba(0, 0, 0, 0.3);
+  --btn-border: rgba(255, 255, 255, 0.08);
+  --btn-bg: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+  --btn-highlight: rgba(255, 255, 255, 0.1);
 }
 
 .dark-theme {
@@ -537,17 +540,30 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-/* Abhyas Practice Trading Simulator Layout */
+/* Abhyas Practice Trading Simulator Layout - Terminal Mode */
 .abhyas-layout {
   display: grid;
-  grid-template-columns: 1.35fr 320px;
-  gap: 24px;
+  grid-template-columns: 280px 1fr 300px;
+  gap: 16px;
   align-items: start;
+}
+
+/* Stack order ticket below chart on smaller screens */
+@media (max-width: 1200px) {
+  .abhyas-layout {
+    grid-template-columns: 260px 1fr;
+  }
+  .abhyas-order-ticket-col {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 1024px) {
   .abhyas-layout {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
+  }
+  .abhyas-order-ticket-col {
+    grid-column: span 1;
   }
 }
 
@@ -732,5 +748,17 @@ h1, h2, h3, h4, h5, h6 {
   100% {
     border-color: rgba(6, 182, 212, 0.5) !important;
     box-shadow: 0 0 35px rgba(6, 182, 212, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.2) !important;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
   }
 }

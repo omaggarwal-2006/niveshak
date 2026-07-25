@@ -1,16 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, ChevronDown, Flame, Shield, HelpCircle, AlertCircle, PhoneCall } from 'lucide-react';
 
 /**
- * Premium Holographic Navbar with Compact Capsule Navigation Dock
+ * Senior SaaS Header & Navigation (Linear / Stripe / Notion Aesthetic)
+ * Single-row nav dock, top utility strip, active solid fill rule, compact chips.
  */
-export default function Navbar({ currentRoute, setCurrentRoute, lang, setLang, theme, setTheme }) {
-  const toggleLang = () => {
-    setLang(lang === 'en' ? 'hi' : 'en');
-  };
+export default function Navbar({ 
+  currentRoute, 
+  setCurrentRoute, 
+  lang, 
+  setLang, 
+  theme, 
+  setTheme,
+  userName = 'Investor',
+  completedLessons = [],
+  completedTracks = [],
+  scanHistory = [],
+  streak = 1,
+  onOpenProfileModal
+}) {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [avatarIcon, setAvatarIcon] = useState(() => localStorage.getItem('safalniveshak_avatar') || '🛡️');
+  const [showMoreNav, setShowMoreNav] = useState(false);
+  const moreNavRef = useRef(null);
 
-  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
-
-  React.useEffect(() => {
+  useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -21,197 +35,427 @@ export default function Navbar({ currentRoute, setCurrentRoute, lang, setLang, t
     };
   }, []);
 
-  const navItems = [
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (moreNavRef.current && !moreNavRef.current.contains(e.target)) {
+        setShowMoreNav(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Update avatar icon on storage change
+  useEffect(() => {
+    const updateAvatar = () => {
+      setAvatarIcon(localStorage.getItem('safalniveshak_avatar') || '🛡️');
+    };
+    window.addEventListener('storage', updateAvatar);
+    return () => window.removeEventListener('storage', updateAvatar);
+  }, []);
+
+  // Calculate Level
+  const lessonsXP = completedLessons.length * 50;
+  const tracksXP = completedTracks.length * 200;
+  const scansXP = scanHistory.length * 25;
+  const totalXP = lessonsXP + tracksXP + scansXP;
+  const level = Math.floor(totalXP / 300) + 1;
+
+  const toggleLang = () => {
+    setLang(lang === 'en' ? 'hi' : 'en');
+  };
+
+  const primaryNavItems = [
     { id: 'home', labelEn: 'Home', labelHi: 'होम', icon: '🏠' },
     { id: 'seekho', labelEn: 'Seekho', labelHi: 'सीखो', icon: '🎓' },
     { id: 'abhyas', labelEn: 'Abhyas', labelHi: 'अभ्यास', icon: '📈' },
     { id: 'bachao', labelEn: 'Scam Shield', labelHi: 'स्कैम शील्ड', icon: '🛡️' },
-    { id: 'sebi', labelEn: 'SEBI Lookup', labelHi: 'सेबी जांच', icon: '🔍' },
-    { id: 'passbook', labelEn: 'Passbook', labelHi: 'पासबुक', icon: '📖' },
+  ];
+
+  const secondaryNavItems = [
     { id: 'safalmitra', labelEn: 'SafalMitra AI', labelHi: 'सफलमित्र AI', icon: '💬' },
     { id: 'leaderboard', labelEn: 'Leaderboard', labelHi: 'लीडरबोर्ड', icon: '🏆' },
     { id: 'about', labelEn: 'About', labelHi: 'विवरण', icon: 'ℹ️' },
   ];
 
+  const allNavItems = [...primaryNavItems, ...secondaryNavItems];
+  const isSecondaryActive = secondaryNavItems.some(item => item.id === currentRoute);
+
   const getTxt = (en, hi) => (lang === 'en' ? en : hi);
 
   return (
-    <header style={{
-      borderBottom: '1px solid rgba(168, 85, 247, 0.25)',
-      backgroundColor: 'rgba(6, 11, 40, 0.55)',
-      backdropFilter: 'blur(20px) saturate(210%)',
-      WebkitBackdropFilter: 'blur(20px) saturate(210%)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 1000,
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.1)'
-    }}>
-      <div className="container" style={{
+    <div style={{ position: 'sticky', top: 0, zIndex: 1000, width: '100%' }}>
+      {/* 1. SLIM UTILITY STRIP (~36px tall) */}
+      <div style={{
+        height: '34px',
+        backgroundColor: '#050811',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
         display: 'flex',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))',
-        paddingBottom: '10px',
-        flexWrap: 'wrap',
-        gap: '16px'
+        justifyContent: 'space-between',
+        padding: '0 24px',
+        fontSize: '0.73rem',
+        color: '#8E9BAE',
+        fontFamily: 'var(--font-body)',
+        fontWeight: '500'
       }}>
-        {/* Logo Brand */}
-        <button 
-          onClick={() => setCurrentRoute('home')}
-          style={{
-            background: 'none',
-            border: 'none',
-            outline: 'none',
-            cursor: 'pointer',
-            textAlign: 'left',
-            padding: '4px 10px',
-            transform: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}
-          aria-label="SafalNiveshak Home"
-        >
-          <div style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #a855f7 0%, #06b6d4 100%)',
-            boxShadow: '0 0 16px rgba(6, 182, 212, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.25rem',
-            color: '#fff',
-            fontWeight: '900',
-            border: '1.5px solid rgba(255, 255, 255, 0.15)'
-          }}>
-            🛡️
-          </div>
-          <div>
-            <h1 style={{ fontSize: '1.2rem', margin: 0, lineHeight: 1.1, color: '#fff', fontWeight: '900', textShadow: '0 0 8px rgba(168, 85, 247, 0.45)' }}>
-              SafalNiveshak
-            </h1>
-            <span style={{ 
-              fontFamily: 'var(--font-body)', 
-              fontSize: '0.62rem', 
-              color: 'rgba(255, 255, 255, 0.5)',
-              letterSpacing: '0.04em',
-              fontWeight: '700',
-              textTransform: 'uppercase'
-            }}>
-              सफल निवेशक • Financial Trust Shield
-            </span>
-          </div>
-        </button>
-
-        {/* Navigation Tabs Capsule */}
-        <nav style={{ 
-          display: 'flex', 
-          gap: '2px', 
-          background: 'rgba(6, 11, 40, 0.6)', 
-          padding: '4px', 
-          borderRadius: '30px', 
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          boxShadow: 'inset 0 1.5px 3px rgba(0,0,0,0.5)',
-          flexWrap: 'wrap'
-        }} aria-label="Main Navigation">
-          {navItems.map((item) => {
-            const isActive = currentRoute === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setCurrentRoute(item.id)}
-                className={`btn-3d ${isActive ? 'nav-tab-active' : ''}`}
-                aria-current={isActive ? 'page' : undefined}
-                style={{
-                  padding: '6px 14px',
-                  fontSize: '0.75rem',
-                  fontWeight: '800',
-                  borderRadius: '30px',
-                  border: 'none',
-                  background: isActive ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(6, 182, 212, 0.15) 100%)' : 'transparent',
-                  color: isActive ? '#fff' : 'rgba(255,255,255,0.6)',
-                  boxShadow: isActive ? '0 4px 12px rgba(168, 85, 247, 0.3), inset 0 1px 0 rgba(255,255,255,0.1)' : 'none',
-                  textShadow: isActive ? '0 0 6px rgba(6, 182, 212, 0.5)' : 'none',
-                  transition: 'all 0.25s',
-                  margin: '1px'
-                }}
-              >
-                <span style={{ marginRight: '4px' }}>{item.icon}</span>
-                {lang === 'en' ? item.labelEn : item.labelHi}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Control Box: Lang Toggle & persistent Demo switch */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          
-          {/* Online/Offline Status Indicator */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            backgroundColor: 'rgba(6, 11, 40, 0.6)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '30px',
-            padding: '6px 14px',
-            fontSize: '0.72rem',
-            fontWeight: '800',
-            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)',
-            color: isOnline ? '#22c55e' : '#f97316'
-          }}>
+        {/* Left Side: System Status & Compliance */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{
-              display: 'inline-block',
-              width: '8px',
-              height: '8px',
+              width: '7px',
+              height: '7px',
               borderRadius: '50%',
-              backgroundColor: isOnline ? '#22c55e' : '#f97316',
-              boxShadow: isOnline ? '0 0 10px #22c55e' : '0 0 10px #f97316',
-              animation: 'pulse 1.5s infinite'
+              backgroundColor: isOnline ? '#33D090' : '#FB923C',
+              boxShadow: isOnline ? '0 0 8px #33D090' : '0 0 8px #FB923C'
             }} />
-            <span>
-              {isOnline ? getTxt("Online", "ऑनलाइन") : getTxt("Offline", "ऑफलाइन")}
+            <span style={{ color: isOnline ? '#33D090' : '#FB923C', fontWeight: '600' }}>
+              {isOnline ? getTxt("All systems operational", "सभी सिस्टम सक्रिय हैं") : getTxt("Offline Mode Active", "ऑफ़लाइन मोड सक्रिय")}
             </span>
           </div>
 
-          {/* Bilingual Toggle */}
-          <button
-            onClick={toggleLang}
-            className="btn-3d"
-            style={{
-              padding: '6px 14px',
-              fontSize: '0.75rem',
-              fontWeight: '900',
-              borderRadius: '30px',
-              background: 'rgba(6, 11, 40, 0.6)',
-              border: '1.5px solid rgba(251, 146, 60, 0.4)',
-              color: '#fb923c',
-            }}
-          >
-            {lang === 'en' ? 'EN ➔ हि' : 'हि ➔ EN'}
-          </button>
+          <span style={{ color: 'rgba(255, 255, 255, 0.15)' }}>|</span>
 
-          {/* Theme Toggle Switch */}
-          <button
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            className="btn-3d"
-            style={{
-              padding: '6px 14px',
-              fontSize: '0.75rem',
-              fontWeight: '900',
-              borderRadius: '30px',
-              background: 'rgba(6, 11, 40, 0.6)',
-              border: '1.5px solid rgba(168, 85, 247, 0.4)',
-              color: '#a78bfa',
-            }}
-          >
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
+          <span style={{ color: '#8E9BAE', cursor: 'pointer', display: 'var(--mobile-hide, inline)' }} onClick={() => setCurrentRoute('about')}>
+            {getTxt("Disclosures & Help Centre", "प्रकटीकरण व सहायता केंद्र")}
+          </span>
+        </div>
 
+        {/* Right Side: Quick Support Links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ color: '#8E9BAE', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <PhoneCall size={12} color="#8B7FFF" />
+            {getTxt("Helpline: 1930", "हेल्पलाइन: १९३०")}
+          </span>
         </div>
       </div>
-    </header>
+
+      {/* 2. MAIN NAVBAR (~64px tall) */}
+      <header style={{
+        height: '64px',
+        backgroundColor: 'rgba(8, 11, 20, 0.85)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)'
+      }}>
+        <div className="container" style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          height: '100%',
+          padding: '0 20px',
+          gap: '16px'
+        }}>
+          
+          {/* LEFT: LOGO MARK & WORDMARK */}
+          <button 
+            onClick={() => setCurrentRoute('home')}
+            style={{
+              background: 'none',
+              border: 'none',
+              outline: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: 0,
+              flexShrink: 0
+            }}
+            aria-label="SafalNiveshak Home"
+          >
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #8B7FFF 0%, #2CD9C5 100%)',
+              boxShadow: '0 0 16px rgba(44, 217, 197, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.2rem',
+              color: '#fff'
+            }}>
+              🛡️
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <h1 style={{ 
+                fontFamily: 'Sora, sans-serif', 
+                fontSize: '1.15rem', 
+                fontWeight: '800', 
+                color: '#FFFFFF', 
+                margin: 0, 
+                lineHeight: 1.1,
+                letterSpacing: '-0.02em'
+              }}>
+                SafalNiveshak
+              </h1>
+              <span style={{ 
+                fontFamily: 'Inter, sans-serif', 
+                fontSize: '0.58rem', 
+                color: '#8E9BAE',
+                letterSpacing: '0.06em',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                display: 'block'
+              }}>
+                SOVEREIGN TRUST SHIELD
+              </span>
+            </div>
+          </button>
+
+          {/* CENTER: SINGLE ROW NAV CONTAINER */}
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.07)',
+            borderRadius: '30px',
+            padding: '3px',
+            boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.4)'
+          }} aria-label="Main Navigation">
+            
+            {/* Primary Nav Items */}
+            {primaryNavItems.map(item => {
+              const isActive = currentRoute === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setCurrentRoute(item.id)}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '0.78rem',
+                    fontWeight: isActive ? '700' : '600',
+                    borderRadius: '24px',
+                    border: 'none',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    background: isActive ? 'linear-gradient(135deg, #8B7FFF 0%, #6C63F5 100%)' : 'transparent',
+                    color: isActive ? '#FFFFFF' : '#8E9BAE',
+                    boxShadow: isActive ? '0 4px 14px rgba(108, 99, 245, 0.4)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  onMouseEnter={e => {
+                    if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
+                  }}
+                  onMouseLeave={e => {
+                    if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <span style={{ fontSize: '0.85rem' }}>{item.icon}</span>
+                  {lang === 'en' ? item.labelEn : item.labelHi}
+                </button>
+              );
+            })}
+
+            {/* Secondary Nav Items or Dropdown "+More" */}
+            <div ref={moreNavRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowMoreNav(!showMoreNav)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.78rem',
+                  fontWeight: isSecondaryActive ? '700' : '600',
+                  borderRadius: '24px',
+                  border: 'none',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                  background: isSecondaryActive ? 'linear-gradient(135deg, #8B7FFF 0%, #6C63F5 100%)' : 'transparent',
+                  color: isSecondaryActive ? '#FFFFFF' : '#8E9BAE',
+                  boxShadow: isSecondaryActive ? '0 4px 14px rgba(108, 99, 245, 0.4)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onMouseEnter={e => {
+                  if (!isSecondaryActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
+                }}
+                onMouseLeave={e => {
+                  if (!isSecondaryActive) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span>✨</span>
+                {getTxt("More", "और")}
+                <ChevronDown size={12} style={{ transform: showMoreNav ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+
+              {/* Dropdown Menu */}
+              {showMoreNav && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  width: '180px',
+                  backgroundColor: '#121729',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '16px',
+                  boxShadow: '0 15px 35px rgba(0, 0, 0, 0.6)',
+                  padding: '6px',
+                  zIndex: 9999,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px'
+                }}>
+                  {secondaryNavItems.map(item => {
+                    const isActive = currentRoute === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setCurrentRoute(item.id);
+                          setShowMoreNav(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          width: '100%',
+                          padding: '8px 12px',
+                          borderRadius: '10px',
+                          border: 'none',
+                          outline: 'none',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          background: isActive ? 'rgba(139, 127, 255, 0.2)' : 'transparent',
+                          color: isActive ? '#FFFFFF' : '#8E9BAE'
+                        }}
+                        onMouseEnter={e => {
+                          if (!isActive) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        }}
+                        onMouseLeave={e => {
+                          if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <span>{item.icon}</span>
+                        {lang === 'en' ? item.labelEn : item.labelHi}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+          </nav>
+
+          {/* RIGHT UTILITY GROUP */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+            
+            {/* Search Icon Button */}
+            <button
+              onClick={() => setCurrentRoute('sebi')}
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                color: '#8E9BAE',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = '#FFFFFF'}
+              aria-label="Search SEBI advisors"
+            >
+              <Search size={14} />
+            </button>
+
+            {/* Bilingual Toggle Pill */}
+            <button
+              onClick={toggleLang}
+              style={{
+                padding: '5px 12px',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                borderRadius: '20px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                color: '#2CD9C5',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(44, 217, 197, 0.4)'}
+            >
+              {lang === 'en' ? 'EN ➔ हि' : 'हि ➔ EN'}
+            </button>
+
+            {/* Streak Chip (Warm Orange Tint, NOT Solid) */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              backgroundColor: 'rgba(251, 146, 60, 0.12)',
+              border: '1px solid rgba(251, 146, 60, 0.25)',
+              borderRadius: '20px',
+              padding: '4px 10px',
+              color: '#FB923C',
+              fontSize: '0.75rem',
+              fontWeight: '800'
+            }}>
+              <Flame size={14} fill="#FB923C" />
+              <span>{streak}d</span>
+            </div>
+
+            {/* Profile Chip (Avatar Circle + Name + Level) */}
+            <button
+              onClick={onOpenProfileModal}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '4px 10px 4px 5px',
+                borderRadius: '20px',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                cursor: 'pointer',
+                color: '#FFFFFF',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(139, 127, 255, 0.4)'}
+            >
+              <div style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #8B7FFF, #2CD9C5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.85rem',
+                fontWeight: '800'
+              }}>
+                {avatarIcon}
+              </div>
+              <span style={{ fontSize: '0.76rem', fontWeight: '700', color: '#FFFFFF' }}>
+                {userName.length > 9 ? userName.slice(0, 7) + '..' : userName}
+              </span>
+              <span style={{ 
+                fontSize: '0.62rem', 
+                color: '#8B7FFF', 
+                backgroundColor: 'rgba(139, 127, 255, 0.15)',
+                border: '1px solid rgba(139, 127, 255, 0.3)',
+                borderRadius: '10px',
+                padding: '1px 6px',
+                fontWeight: '800' 
+              }}>
+                Lvl {level}
+              </span>
+            </button>
+
+          </div>
+
+        </div>
+      </header>
+    </div>
   );
 }

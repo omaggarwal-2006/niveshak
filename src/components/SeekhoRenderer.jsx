@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { curriculumMatrix } from '../data/lessons';
 import CertificateGenerator from './CertificateGenerator';
+import { useAuth } from '../context/AuthContext';
+import { updateLessonProgress } from '../services/db';
+import toast from 'react-hot-toast';
 
 export default function SeekhoRenderer(props) {
   const { lang, getTxt, setCurrentRoute, stockKnowledge } = props;
@@ -26,26 +29,22 @@ export default function SeekhoRenderer(props) {
   // Telemetry benchmarks
   const [latencyMs, setLatencyMs] = useState(0.08);
 
+  const { currentUser } = useAuth();
+  
   // Fetch student progress ledger on mount
   const fetchProgress = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/learning/progress");
-      if (res.ok) {
-        const data = await res.json();
-        setProgressList(data);
-        localStorage.setItem('safalniveshak_learning_progress', JSON.stringify(data));
-      } else {
-        throw new Error("offline");
-      }
-    } catch (err) {
-      const data = JSON.parse(localStorage.getItem('safalniveshak_learning_progress') || '[]');
-      setProgressList(data);
+    // Read from Firestore (currentUser)
+    if (currentUser && currentUser.completedLessons) {
+      // Map legacy array format to progressList format for UI compatibility if needed
+      // Actually, completeTierState writes to progressList locally, so let's use both.
+      const cloudProgress = currentUser.learningProgress || [];
+      setProgressList(cloudProgress);
     }
   };
 
   useEffect(() => {
     fetchProgress();
-  }, []);
+  }, [currentUser]);
 
   // Speech helper
   const speakText = (text) => {
@@ -108,55 +107,35 @@ export default function SeekhoRenderer(props) {
 
   // Sync completion to backend
   const completeTierState = async (moduleId, tierLevel, score) => {
-    // Write local storage progress first (Offline fallback)
-    const localKey = 'safalniveshak_learning_progress';
-    const currentLocal = JSON.parse(localStorage.getItem(localKey) || '[]');
+    // 1. Update local progressList state
     const newEntry = { module_id: moduleId, tier_level: tierLevel, status: "COMPLETED", score };
-    const idx = currentLocal.findIndex(p => p.module_id === moduleId && p.tier_level === tierLevel);
+    const updatedProgress = [...progressList];
+    const idx = updatedProgress.findIndex(p => p.module_id === moduleId && p.tier_level === tierLevel);
     if (idx >= 0) {
-      currentLocal[idx] = newEntry;
+      updatedProgress[idx] = newEntry;
     } else {
-      currentLocal.push(newEntry);
+      updatedProgress.push(newEntry);
     }
-    localStorage.setItem(localKey, JSON.stringify(currentLocal));
+    setProgressList(updatedProgress);
 
-    // Grant XP and lessons complete tracking in parent App state
-    const storedLessons = JSON.parse(localStorage.getItem('safalniveshak_lessons') || '[]');
+    // 2. Grant XP and lessons complete tracking in parent App state
     const numId = parseInt(moduleId.replace('module-', ''), 10);
-    if (numId && !storedLessons.includes(numId)) {
-      const updatedLessons = [...storedLessons, numId];
-      localStorage.setItem('safalniveshak_lessons', JSON.stringify(updatedLessons));
-      if (props.setCompletedLessons) {
-        props.setCompletedLessons(updatedLessons);
-      }
+    const storedLessons = (currentUser && currentUser.completedLessons) ? currentUser.completedLessons : [];
+    const updatedLessons = storedLessons.includes(numId) ? storedLessons : [...storedLessons, numId];
+    
+    if (props.setCompletedLessons) {
+      props.setCompletedLessons(updatedLessons);
     }
 
-    try {
-      const res = await fetch("http://localhost:5000/api/learning/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: "sandbox_user",
-          moduleId,
-          tierLevel,
-          status: "COMPLETED",
-          score
-        })
+    // 3. Write to Firestore
+    if (currentUser) {
+      await updateLessonProgress(currentUser.uid, {
+        learningProgress: updatedProgress,
+        completedLessons: updatedLessons
       });
-
-      if (res.ok) {
-        setBypassAlert(null);
-        await fetchProgress();
-      } else {
-        const errorData = await res.json();
-        if (errorData.error === 'ILLEGAL_STATE_BYPASS') {
-          throw new Error(errorData.message);
-        }
-      }
-    } catch (err) {
-      // Local fallback handles offline silently
-      await fetchProgress();
     }
+    
+    setBypassAlert(null);
   };
 
   // Measure calculation latency across all 9 modules on render
@@ -182,7 +161,7 @@ export default function SeekhoRenderer(props) {
     if (status === 'LOCKED') {
       const preReq = tier === 'INTERMEDIATE' ? 'Beginner' : 'Intermediate';
       const msg = `Progressive Lock Bypass Alert: ${preReq} tier for ${moduleId} must be COMPLETED before unlocking ${tier}.`;
-      setBypassAlert(msg);
+      toast.error(msg, { icon: '🔒' });
       speakText(`Progressive lock violation. Complete ${preReq} first.`);
       return;
     }
@@ -208,9 +187,11 @@ export default function SeekhoRenderer(props) {
     if (selectedOption === tierData.quiz.answerIndex) {
       setQuizCorrect(true);
       completeTierState(moduleId, tier, 100);
+      toast.success("Correct answer locked! Progressive tier completed.", { icon: '🎓' });
       speakText("Correct answer locked! Progressive tier completed.");
     } else {
       setQuizCorrect(false);
+      toast.error("Incorrect answer structure. Review chapter notes and retry.");
       speakText("Incorrect answer structure. Review chapter notes and retry.");
     }
   };
@@ -560,24 +541,6 @@ export default function SeekhoRenderer(props) {
         })}
       </div>
 
-      {/* EXCEPTION BYPASS ALERT BANNER */}
-      {bypassAlert && (
-        <div style={{
-          backgroundColor: 'rgba(239, 68, 68, 0.08)',
-          border: '1.5px solid #ef4444',
-          color: '#ef4444',
-          padding: '12px 16px',
-          borderRadius: '6px',
-          fontSize: '0.82rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontWeight: 'bold'
-        }}>
-          <span>⚠️</span>
-          <span>{bypassAlert}</span>
-        </div>
-      )}
 
       {/* 9-MODULE MATRIX GRID */}
       <div style={{
